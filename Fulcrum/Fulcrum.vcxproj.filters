@@ -105,7 +105,6 @@
     <None Include="data\meteor_cnn\Y_val.bin">
       <Filter>data\meteors</Filter>
     </None>
-    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Tensor.cu">
