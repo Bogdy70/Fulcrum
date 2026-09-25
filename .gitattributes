@@ -1,1 +1,2 @@
 TinyPytorch/data/meteor_cnn/X_train.bin filter=lfs diff=lfs merge=lfs -text
+Fulcrum/data/meteor_cnn/X_train.bin filter=lfs diff=lfs merge=lfs -text

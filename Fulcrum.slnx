@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="TinyPytorch/TinyPytorch.vcxproj" Id="66b07ca4-03c5-4e74-a71a-9a2519c888fe" />
+  <Project Path="Fulcrum/Fulcrum.vcxproj" Id="66b07ca4-03c5-4e74-a71a-9a2519c888fe" />
 </Solution>

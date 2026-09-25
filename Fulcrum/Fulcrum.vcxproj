@@ -24,7 +24,7 @@
     <ProjectGuid>{66b07ca4-03c5-4e74-a71a-9a2519c888fe}</ProjectGuid>
     <RootNamespace>NeuralNetwork</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>TinyPytorch</ProjectName>
+    <ProjectName>Fulcrum</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -149,7 +149,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CPUTensor.cpp" />
-    <ClCompile Include="TinyPytorch.cpp" />
+    <ClCompile Include="Fulcrum.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="data\cat\cat_shapes.txt" />
