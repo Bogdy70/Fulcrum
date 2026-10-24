@@ -4,10 +4,36 @@
 #include <string>
 #include <chrono>
 #include <stdexcept>
+#include <fstream>
+#include <filesystem>
 #include "Tensor.cuh"
 #include "CPUTensor.h"
 
 using namespace std;
+
+void save_vector_bin(const vector<float>& x, const filesystem::path& path)
+{
+    ofstream outbin(path, ios::binary | ios::trunc);
+
+    if (!outbin)
+        throw runtime_error("Unable to open write file!");
+
+    outbin.write(reinterpret_cast<const char*>(x.data()), x.size() * sizeof(float));
+
+    if (!outbin)
+        throw runtime_error("Unable to write to file!");
+}
+
+void load_vector_bin(vector<float>& x, const filesystem::path& path)
+{
+    ifstream inbin(path, ios::binary);
+
+    if (!inbin)
+        throw runtime_error("Unable to open read file!");
+
+    if (!(inbin.read(reinterpret_cast<char*>(x.data()), x.size() * sizeof(float))))
+        throw runtime_error("Unable to read the file!");
+}
 
 Tensor sigmoid(const Tensor& A)
 {
@@ -560,18 +586,6 @@ Parameters train_cnn(const Tensor& Xtrain,
 
             auto current_time = chrono::high_resolution_clock::now();
             chrono::duration<double> time = current_time - start_time;
-
-            /*int lastConv = static_cast<int>(cnn_params.W.size()) - 2;
-            int last = lastConv + 1;
-
-            cout << "\nLast conv Z:\n";
-            train_frd_cache.Z[lastConv].toCPU().print();
-
-            cout << "\nLast pooled A:\n";
-            train_frd_cache.A[lastConv].toCPU().print();
-
-            cout << "\nPredictions:\n";
-            train_frd_cache.A[last].toCPU().print();*/
 
             cout << "Epoch: " << epoch << " || Train objective: " << train_objective << " || Train cost: " << train_cost << " || Test cost: " << test_cost << " || Train acc: " << train_accuracy * 100.0f << " % || Test acc: " << test_accuracy * 100.0f << " % || Time: " << time.count() << " sec\n";
         }
@@ -1502,6 +1516,114 @@ int main()
         Tensor Y_Imgtest = Y_Img.clone();
 
         Parameters cnn_params_test1 = train_cnn(Img, Imgtest, Y_Img, Y_Imgtest, cv_stats1, mx_stats1, "relu", 0.001f, 1000, 100);
+
+        cout << "\n\nSimple text Write + Read test";
+        {
+            ofstream out("test1.txt");
+
+            if (!out)
+                throw runtime_error("Unable to open file!");
+
+            out << 2.5f << "\n";
+            out << 23457.8f;
+
+            if (!out)
+                throw runtime_error("Unable to write to file!");
+
+            out.close();
+
+            if (!out)
+                throw runtime_error("Unable to close file!");
+        }
+
+        float a = 0.0f;
+        float b = 0.0f;
+
+        {
+            ifstream in("test1.txt");
+
+            if (!in)
+                throw runtime_error("Unable to open file!");
+
+            if (!(in >> a >> b))
+                throw runtime_error("Unable to read file!");
+        }
+        cout << "\n\n" << a << " " << b << "\n";
+
+        cout << "\n\nByte write + read test\n\n";
+
+        {
+            ofstream outbin("test2.bin", ios::binary | ios::trunc); //binary + delete anything before this point in the file
+
+            if (!outbin)
+                throw runtime_error("Unable to open file!");
+
+            outbin.write(reinterpret_cast<const char*>(&b), sizeof(b));
+
+            if (!outbin)
+                throw runtime_error("Unable to write to file!");
+        }
+
+        float c = 0.0f;
+
+        {
+            ifstream inbin("test2.bin", ios::binary);
+
+            if (!inbin)
+                throw runtime_error("Unable to open file!");
+
+            if (!(inbin.read(reinterpret_cast<char*>(&c), sizeof(c))))
+                throw runtime_error("Unable to read from file!");
+        }
+        cout << "\n" << c << "\n\n";
+
+        cout << "\n\nVector bytes write + read test\n\n";
+
+        vector<float> xv = { 1, 2, 3, 4, 5, 7, 9 };
+
+        {
+            ofstream outbin1("test2.bin", ios::binary | ios::trunc);
+
+            if (!outbin1)
+                throw runtime_error("Unable to open file!");
+
+            outbin1.write(reinterpret_cast<const char*>(xv.data()), xv.size() * sizeof(float));
+
+            if (!outbin1)
+                throw runtime_error("Unable to write to file!");
+        }
+
+        vector<float> load_xv(xv.size());
+
+        {
+            ifstream inbin1("test2.bin", ios::binary);
+
+            if (!inbin1)
+                throw runtime_error("Unable to open file!");
+
+            if (!(inbin1.read(reinterpret_cast<char*>(load_xv.data()), load_xv.size() * sizeof(float))))
+                throw runtime_error("Unable to read from file!");
+        }
+        cout << "\n";
+        for (int i = 0; i < load_xv.size(); i++)
+            cout << load_xv[i] << " ";
+        cout << "\n\n";
+
+        cout << "\n\nFunction vector bytes write + read test\n\n";
+
+        vector<float> yv = { 1, 1, 1, 7, 7, 7, 8 };
+
+        filesystem::path save_path = "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test.bin";
+        save_vector_bin(yv, save_path);
+
+        vector<float> load_yv(7);
+
+        load_vector_bin(load_yv, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test.bin");
+
+        cout << "\n";
+        for (int i = 0; i < load_yv.size(); i++)
+            cout << load_yv[i] << " ";
+        cout << "\n\n";
 
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
