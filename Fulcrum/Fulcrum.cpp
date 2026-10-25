@@ -35,6 +35,93 @@ void load_vector_bin(vector<float>& x, const filesystem::path& path)
         throw runtime_error("Unable to read the file!");
 }
 
+void save_tensor(const Tensor& T, const filesystem::path& path)
+{
+    ofstream tout(path, ios::binary | ios::trunc);
+
+    if (!tout)
+        throw runtime_error("Unable to open write file!");
+
+    const char magic[4] = { 'F', 'L', 'C', 'T' };
+
+    float v = 0.01f;
+
+    float dtype = T.getDataType() == DataType::float32 ? 0.0f : 1.0f;
+
+    int rank = T.dim();
+
+    tout.write(magic, sizeof(magic));
+
+    tout.write(reinterpret_cast<const char*>(&v), sizeof(v));
+
+    tout.write(reinterpret_cast<const char*>(&dtype), sizeof(dtype));
+
+    tout.write(reinterpret_cast<const char*>(&rank), sizeof(rank));
+
+    tout.write(reinterpret_cast<const char*>(T.getShape().data()), rank * sizeof(float));
+
+    tout.write(reinterpret_cast<const char*>(T.toCPU().getFloatData()), T.size() * sizeof(float));
+
+    if (!tout)
+        throw runtime_error("Unable to finish file write!");
+}
+
+Tensor load_tensor(const filesystem::path& path)
+{
+    ifstream tin(path, ios::binary);
+
+    if (!tin)
+        throw runtime_error("Unable to open read file!");
+
+    const char magic[4] = { 'F', 'L', 'C', 'T' };
+
+    char load_magic[4] = { 0 };
+
+    if (!(tin.read(load_magic, sizeof(load_magic))))
+        throw runtime_error("Unable to read magic number!");
+
+    if (memcmp(load_magic, magic, 4) != 0)
+        throw runtime_error("Invalid file format!");
+
+    float v = 0.01f;
+
+    float load_v = 0.0f;
+
+    if (!(tin.read(reinterpret_cast<char*>(&load_v), sizeof(load_v))))
+        throw runtime_error("Unable to read version number!");
+
+    if (load_v != v)
+        throw runtime_error("Invalid file version!");
+
+    float load_dtype = 0.0f;
+
+    if (!(tin.read(reinterpret_cast<char*>(&load_dtype), sizeof(load_dtype))))
+        throw runtime_error("Unable to read data type!");
+
+    DataType tdtype = load_dtype == 0.0f ? DataType::float32 : DataType::int32;
+
+    int load_rank = 0;
+
+    if (!(tin.read(reinterpret_cast<char*>(&load_rank), sizeof(load_rank))))
+        throw runtime_error("Unable to read rank!");
+
+    vector<int> load_shape(load_rank);
+
+    if (!(tin.read(reinterpret_cast<char*>(load_shape.data()), load_rank * sizeof(int))))
+        throw runtime_error("Unable to read tensor shape!");
+
+    Tensor res(load_shape, tdtype);
+
+    vector<float> payload(res.size());
+
+    if (!(tin.read(reinterpret_cast<char*>(payload.data()), res.size() * sizeof(float))))
+        throw runtime_error("Unable to read tensor payload!");
+
+    res = payload;
+
+    return res;
+}
+
 Tensor sigmoid(const Tensor& A)
 {
     return 1.0f / (1.0f + Tensor::expT(-1.0f * A));
@@ -1624,6 +1711,154 @@ int main()
         for (int i = 0; i < load_yv.size(); i++)
             cout << load_yv[i] << " ";
         cout << "\n\n";
+
+        cout << "\n\nStruct bytes write + read test\n\n";
+
+        DataType type = DataType::int32;
+        float dtype = type == DataType::float32 ? 0.0f : 1.0f;
+
+        {
+            ofstream structout("test3.bin", ios::binary | ios::trunc);
+
+            if (!structout)
+                throw runtime_error("Unable to open write file!");
+
+            const char magic[4] = { 'F', 'L', 'C', 'T' };
+
+            float v = 0.01f;
+
+            structout.write(magic, sizeof(magic));
+
+            structout.write(reinterpret_cast<const char*>(&v), sizeof(float));
+
+            structout.write(reinterpret_cast<const char*>(&dtype), sizeof(float));
+
+            if (!structout)
+                throw runtime_error("Unable to complete file write!");
+        }
+
+        {
+            ifstream structin("test3.bin", ios::binary);
+
+            if (!structin)
+                throw runtime_error("Unable to open read file!");
+
+            char magic[4] = { 0 };
+            const char magic_test[4] = { 'F', 'L', 'C', 'T' };
+
+            structin.read(magic, sizeof(magic));
+
+            if (std::memcmp(magic, magic_test, 4) != 0)
+                throw runtime_error("Ivalid file format!");
+
+            float v_test = 0.01f;
+
+            float v = 0.0f;
+
+            structin.read(reinterpret_cast<char*>(&v), sizeof(float));
+
+            if (v != v_test)
+                throw runtime_error("Invalid version!");
+
+            if (!(structin.read(reinterpret_cast<char*>(&dtype), sizeof(float))))
+                throw runtime_error("Unable to read from file!");
+        }
+        if (dtype == 0.0f)
+            cout << "\n\nfloat32" << "\n";
+        if (dtype == 1.0f)
+            cout << "\n\nint32" << "\n";
+
+        cout << "\n\nTensor bytes write + read test!\n\n";
+
+        Tensor WRT({ 2, 3 });
+        WRT = vector<float>{ 1, 2, 3, 4, 5, 6 };
+        WRT.toCPU().print();
+        CPUTensor wrt_cpu = WRT.toCPU();
+
+        const char magic[4] = { 'F', 'L', 'C', 'T' };
+        float vr = 0.01f;
+
+        {
+            ofstream tout("test4.bin", ios::binary | ios::trunc);
+
+            if (!tout)
+                throw runtime_error("Unable to ope write file!");
+
+            float dtype = wrt_cpu.getDataType() == DataType::float32 ? 0.0f : 1.0f;
+
+            int rank = wrt_cpu.dim();
+
+            tout.write(magic, sizeof(magic));
+
+            tout.write(reinterpret_cast<const char*>(&vr), sizeof(vr));
+
+            tout.write(reinterpret_cast<const char*>(&dtype), sizeof(dtype));
+
+            tout.write(reinterpret_cast<const char*>(&rank), sizeof(rank));
+
+            tout.write(reinterpret_cast<const char*>(wrt_cpu.getShape().data()), rank * sizeof(rank));
+
+            tout.write(reinterpret_cast<const char*>(wrt_cpu.getFloatData()), wrt_cpu.size() * sizeof(float));
+
+            if (!tout)
+                throw runtime_error("Unable to finish file write!");
+        }
+
+        {
+            ifstream tin("test4.bin", ios::binary);
+
+            if (!tin)
+                throw runtime_error("Unable to open read file!");
+
+            char load_magic[4] = { 0 };
+
+            tin.read(load_magic, sizeof(load_magic));
+
+            if (memcmp(load_magic, magic, 4) != 0)
+                throw runtime_error("Invalid file format!");
+
+            float load_vr = 0.0f;
+
+            tin.read(reinterpret_cast<char*>(&load_vr), sizeof(load_vr));
+
+            if (load_vr != vr)
+                throw runtime_error("Invalid file version!");
+
+            float load_dtype = 0.0f;
+
+            tin.read(reinterpret_cast<char*>(&load_dtype), sizeof(load_dtype));
+
+            int load_rank = 0;
+
+            tin.read(reinterpret_cast<char*>(&load_rank), sizeof(load_rank));
+
+            vector<int> load_shape(load_rank);
+
+            tin.read(reinterpret_cast<char*>(load_shape.data()), load_rank * sizeof(load_rank));
+
+            Tensor load_wrt(load_shape);
+
+            vector<float> load_payload(load_wrt.size());
+
+            tin.read(reinterpret_cast<char*>(load_payload.data()), load_wrt.size() * sizeof(float));
+
+            load_wrt = load_payload;
+
+            cout << "\n";
+            load_wrt.toCPU().print();
+        }
+
+        cout << "\n\nTensor bytes function write + read test\n\n";
+
+        Tensor WRT1({ 4, 5 });
+        WRT1 = vector<float>{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+
+        save_tensor(WRT1, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test1.bin");
+
+        Tensor load_wrt1 = load_tensor("C:/Users/ASUS/Downloads/Fulcrum_save_tests/test1.bin");
+
+        cout << "\n";
+        load_wrt1.toCPU().print();
 
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
