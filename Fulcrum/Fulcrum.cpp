@@ -171,6 +171,151 @@ struct Parameters
     Parameters(int dim) : W(dim), B(dim) {}
 };
 
+void save_model(const Parameters& params, const filesystem::path& path)
+{
+    ofstream pout(path, ios::binary | ios::trunc);
+
+    if (!pout)
+        throw runtime_error("Unable to open write file!");
+
+    const char magic[4] = { 'F', 'L', 'C', 'T' };
+    float v = 0.01f;
+    int dtype = params.W[1].getDataType() == DataType::float32 ? 0 : 1;
+    int dim = params.W.size();
+
+    pout.write(magic, sizeof(magic));
+
+    pout.write(reinterpret_cast<const char*>(&v), sizeof(v));
+
+    pout.write(reinterpret_cast<const char*>(&dtype), sizeof(dtype));
+
+    pout.write(reinterpret_cast<const char*>(&dim), sizeof(dim));
+
+    for (int i = 1; i < dim; i++)
+    {
+        int rankW = params.W[i].dim();
+        int rankB = params.B[i].dim();
+
+        pout.write(reinterpret_cast<const char*>(&rankW), sizeof(rankW));
+        pout.write(reinterpret_cast<const char*>(&rankB), sizeof(rankB));
+
+        pout.write(reinterpret_cast<const char*>(params.W[i].getShape().data()), rankW * sizeof(int));
+        pout.write(reinterpret_cast<const char*>(params.B[i].getShape().data()), rankB * sizeof(int));
+
+        if (dtype == 0)
+        {
+            pout.write(reinterpret_cast<const char*>(params.W[i].toCPU().getFloatData()), params.W[i].byteSize());
+            pout.write(reinterpret_cast<const char*>(params.B[i].toCPU().getFloatData()), params.B[i].byteSize());
+        }
+        else
+        {
+            pout.write(reinterpret_cast<const char*>(params.W[i].toCPU().getIntData()), params.W[i].byteSize());
+            pout.write(reinterpret_cast<const char*>(params.B[i].toCPU().getIntData()), params.B[i].byteSize());
+        }
+    }
+
+    if (!pout)
+        throw runtime_error("Uable to finish file write!");
+}
+
+Parameters load_model(const filesystem::path& path)
+{
+    ifstream pin(path, ios::binary);
+
+    if (!pin)
+        throw runtime_error("Unable to open read file!");
+
+    const char magic[4] = { 'F', 'L', 'C', 'T' };
+    char load_magic[4] = { 0 };
+
+    if (!(pin.read(load_magic, sizeof(load_magic))))
+        throw runtime_error("Unable to read magic number!");
+
+    if (memcmp(load_magic, magic, 4))
+        throw runtime_error("Invalid file format!");
+
+    float v = 0.01f;
+    float load_v = 0.0f;
+
+    if (!(pin.read(reinterpret_cast<char*>(&load_v), sizeof(load_v))))
+        throw runtime_error("Unable to read version number!");
+
+    if (load_v != v)
+        throw runtime_error("Invalid file version!");
+
+    int load_type = 0;
+
+    if (!(pin.read(reinterpret_cast<char*>(&load_type), sizeof(load_type))))
+        throw runtime_error("Unable to load data type!");
+
+    DataType dtype = load_type == 0 ? DataType::float32 : DataType::int32;
+
+    int load_dim = 0;
+
+    if (!(pin.read(reinterpret_cast<char*>(&load_dim), sizeof(load_dim))))
+        throw runtime_error("Unable to read total dimension!");
+
+    Parameters params(load_dim);
+
+    for (int i = 1; i < load_dim; i++)
+    {
+        int load_rankW = 0;
+        int load_rankB = 0;
+
+        if (!(pin.read(reinterpret_cast<char*>(&load_rankW), sizeof(load_rankW))))
+            throw runtime_error("Unable to read W rank for Tensor " + i);
+
+        if (!(pin.read(reinterpret_cast<char*>(&load_rankB), sizeof(load_rankB))))
+            throw runtime_error("Unable to read B rank for Tensor " + i);
+
+        vector<int> load_shapeW(load_rankW);
+        vector<int> load_shapeB(load_rankB);
+
+        if (!(pin.read(reinterpret_cast<char*>(load_shapeW.data()), load_rankW * sizeof(int))))
+            throw runtime_error("Unable to read W shape for Tensor " + i);
+
+        if (!(pin.read(reinterpret_cast<char*>(load_shapeB.data()), load_rankB * sizeof(int))))
+            throw runtime_error("Unable to read B shape for Tensor " + i);
+
+        Tensor load_W(load_shapeW, dtype);
+        Tensor load_B(load_shapeB, dtype);
+
+        if (dtype == DataType::float32)
+        {
+            vector<float> load_ploadW(load_W.size());
+            vector<float> load_ploadB(load_B.size());
+
+            if (!(pin.read(reinterpret_cast<char*>(load_ploadW.data()), load_W.size() * sizeof(float))))
+                throw runtime_error("Unable to read W payload for Tensor " + i);
+
+            if (!(pin.read(reinterpret_cast<char*>(load_ploadB.data()), load_B.size() * sizeof(float))))
+                throw runtime_error("Unable to read B payload for Tensor" + i);
+
+            load_W = load_ploadW;
+            load_B = load_ploadB;
+        }
+        else
+        {
+            vector<int> load_ploadW(load_W.size());
+            vector<int> load_ploadB(load_B.size());
+
+            if (!(pin.read(reinterpret_cast<char*>(load_ploadW.data()), load_W.size() * sizeof(int))))
+                throw runtime_error("Unable to read W payload for Tensor " + i);
+
+            if (!(pin.read(reinterpret_cast<char*>(load_ploadB.data()), load_B.size() * sizeof(int))))
+                throw runtime_error("Unable to read B payload for Tensor" + i);
+
+            load_W = load_ploadW;
+            load_B = load_ploadB;
+        }
+
+        params.W[i] = move(load_W);
+        params.B[i] = move(load_B);
+    }
+
+    return params;
+}
+
 float cost(const Tensor& Y, const Tensor& pred, const Parameters& params, const float lambda_l1=0.0f, const float lambda_l2=0.0f)
 {
     float m = static_cast<float>(Y.getShape()[Y.dim()-1]);
@@ -298,6 +443,80 @@ struct NetworkConfig
 
     NetworkConfig(const vector<int>& dim_list, const string& activ_name) : dims(dim_list), activation(activ_name) {}
 };
+
+#include <cstring>
+#include <cstdint>
+#include <iostream>
+
+// Compare metadata and payload.
+bool same_tensor(const Tensor& A, const Tensor& B)
+{
+    if (A.getDataType() != B.getDataType())
+        return false;
+
+    if (A.getShape() != B.getShape())
+        return false;
+
+    if (A.size() == 0)
+        return true;
+
+    CPUTensor cpuA = A.toCPU();
+    CPUTensor cpuB = B.toCPU();
+
+    std::size_t count = static_cast<std::size_t>(A.size());
+
+    switch (A.getDataType())
+    {
+    case DataType::float32:
+        return std::memcmp(
+            cpuA.getFloatData(),
+            cpuB.getFloatData(),
+            count * sizeof(float)) == 0;
+
+    case DataType::int32:
+        return std::memcmp(
+            cpuA.getIntData(),
+            cpuB.getIntData(),
+            count * sizeof(int32_t)) == 0;
+
+    default:
+        return false;
+    }
+}
+
+bool compare_params(const Parameters& original,
+    const Parameters& loaded)
+{
+    if (original.W.size() != loaded.W.size() ||
+        original.B.size() != loaded.B.size() ||
+        original.W.size() != original.B.size())
+    {
+        std::cout << "FAIL: parameter vector sizes do not match!\n";
+        return false;
+    }
+
+    bool all_match = true;
+
+    // Index 0 is unused in your current Parameters convention.
+    for (std::size_t l = 1; l < original.W.size(); l++)
+    {
+        bool weights_match = same_tensor(original.W[l], loaded.W[l]);
+        bool biases_match = same_tensor(original.B[l], loaded.B[l]);
+
+        std::cout << "W[" << l << "]: "
+            << (weights_match ? "PASS" : "FAIL") << '\n';
+
+        std::cout << "B[" << l << "]: "
+            << (biases_match ? "PASS" : "FAIL") << '\n';
+
+        all_match = all_match && weights_match && biases_match;
+    }
+
+    std::cout << "\nOverall: "
+        << (all_match ? "PASS" : "FAIL") << '\n';
+
+    return all_match;
+}
 
 void printMnistImage(const CPUTensor& img, int sample_idx)
 {
@@ -1859,6 +2078,14 @@ int main()
 
         cout << "\n";
         load_wrt1.toCPU().print();
+
+        cout << "\n\nModel bytes function write + read test\n\n";
+
+        save_model(cnn_params_test1, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test2.bin");
+
+        Parameters load_params = load_model("C:/Users/ASUS/Downloads/Fulcrum_save_tests/test2.bin");
+
+        compare_params(cnn_params_test1, load_params);
 
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
