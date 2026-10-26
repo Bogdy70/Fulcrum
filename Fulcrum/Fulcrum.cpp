@@ -2365,6 +2365,45 @@ int main()
 
         compare_cnn(model1, load_model1);
 
+        cout << "\n\nJust some indexing test\n\n";
+
+        int choose_idx = 0;
+
+        int actual_idx = choose_idx * X_test_meteors.getStride()[0];
+
+        vector<int> some_shape;
+        some_shape.push_back(1);
+
+        for (int i = 1; i < X_test_meteors.getShape().size(); i++)
+        {
+            some_shape.push_back(X_test_meteors.getShape()[i]);
+        }
+
+        CPUTensor one_img_cnn(some_shape);
+
+        for (int i = 0; i < X_test_meteors.getShape()[1]; i++)
+        {
+            for (int j = 0; j < X_test_meteors.getShape()[2]; j++)
+            {
+                for (int k = 0; k < X_test_meteors.getShape()[3]; k++)
+                {
+                    int one_idx = i * X_test_meteors.getStride()[1] + j * X_test_meteors.getStride()[2] + k * X_test_meteors.getStride()[3];
+                    int the_idx = actual_idx + i * X_test_meteors.getStride()[1] + j * X_test_meteors.getStride()[2] + k * X_test_meteors.getStride()[3];
+
+                    one_img_cnn(one_idx) = X_test_meteors(the_idx);
+                }
+            }
+        }
+
+        cout << "\n(";
+        for (int i = 0; i < one_img_cnn.dim(); i++)
+        {
+            cout << one_img_cnn.getShape()[i];
+            if (i != one_img_cnn.dim() - 1)
+                cout << ", ";
+        }
+        cout << ")";
+
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
 
