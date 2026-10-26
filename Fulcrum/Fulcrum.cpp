@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <fstream>
 #include <filesystem>
+#include <cstring>
+#include <cstdint>
 #include "Tensor.cuh"
 #include "CPUTensor.h"
 
@@ -263,19 +265,19 @@ Parameters load_model(const filesystem::path& path)
         int load_rankB = 0;
 
         if (!(pin.read(reinterpret_cast<char*>(&load_rankW), sizeof(load_rankW))))
-            throw runtime_error("Unable to read W rank for Tensor " + i);
+            throw runtime_error("Unable to read W rank for Tensor " + to_string(i));
 
         if (!(pin.read(reinterpret_cast<char*>(&load_rankB), sizeof(load_rankB))))
-            throw runtime_error("Unable to read B rank for Tensor " + i);
+            throw runtime_error("Unable to read B rank for Tensor " + to_string(i));
 
         vector<int> load_shapeW(load_rankW);
         vector<int> load_shapeB(load_rankB);
 
         if (!(pin.read(reinterpret_cast<char*>(load_shapeW.data()), load_rankW * sizeof(int))))
-            throw runtime_error("Unable to read W shape for Tensor " + i);
+            throw runtime_error("Unable to read W shape for Tensor " + to_string(i));
 
         if (!(pin.read(reinterpret_cast<char*>(load_shapeB.data()), load_rankB * sizeof(int))))
-            throw runtime_error("Unable to read B shape for Tensor " + i);
+            throw runtime_error("Unable to read B shape for Tensor " + to_string(i));
 
         Tensor load_W(load_shapeW, dtype);
         Tensor load_B(load_shapeB, dtype);
@@ -286,10 +288,10 @@ Parameters load_model(const filesystem::path& path)
             vector<float> load_ploadB(load_B.size());
 
             if (!(pin.read(reinterpret_cast<char*>(load_ploadW.data()), load_W.size() * sizeof(float))))
-                throw runtime_error("Unable to read W payload for Tensor " + i);
+                throw runtime_error("Unable to read W payload for Tensor " + to_string(i));
 
             if (!(pin.read(reinterpret_cast<char*>(load_ploadB.data()), load_B.size() * sizeof(float))))
-                throw runtime_error("Unable to read B payload for Tensor" + i);
+                throw runtime_error("Unable to read B payload for Tensor" + to_string(i));
 
             load_W = load_ploadW;
             load_B = load_ploadB;
@@ -300,10 +302,10 @@ Parameters load_model(const filesystem::path& path)
             vector<int> load_ploadB(load_B.size());
 
             if (!(pin.read(reinterpret_cast<char*>(load_ploadW.data()), load_W.size() * sizeof(int))))
-                throw runtime_error("Unable to read W payload for Tensor " + i);
+                throw runtime_error("Unable to read W payload for Tensor " + to_string(i));
 
             if (!(pin.read(reinterpret_cast<char*>(load_ploadB.data()), load_B.size() * sizeof(int))))
-                throw runtime_error("Unable to read B payload for Tensor" + i);
+                throw runtime_error("Unable to read B payload for Tensor" + to_string(i));
 
             load_W = load_ploadW;
             load_B = load_ploadB;
@@ -444,9 +446,201 @@ struct NetworkConfig
     NetworkConfig(const vector<int>& dim_list, const string& activ_name) : dims(dim_list), activation(activ_name) {}
 };
 
-#include <cstring>
-#include <cstdint>
-#include <iostream>
+struct CNN_model
+{
+    Parameters params;
+    vector<convStats> cv_stats;
+    vector<MaxPoolStats> mx_stats;
+    string activ;
+
+    CNN_model(Parameters& prm, const vector<convStats>& cv, const vector<MaxPoolStats>& mx, const string& act): params(move(prm)), cv_stats(cv), mx_stats(mx), activ(act) {}
+};
+
+void save_cnn(const CNN_model& model, const filesystem::path& path)
+{
+    ofstream mout(path, ios::binary | ios::trunc);
+
+    if (!mout)
+        throw runtime_error("Unable to open write file!");
+
+    const char magic[4] = { 'F', 'L', 'C', 'T' };
+    float v = 0.01f;
+    int dtype = model.params.W[1].getDataType() == DataType::float32 ? 0 : 1;
+    int dim = model.params.W.size();
+
+    mout.write(magic, sizeof(magic));
+
+    mout.write(reinterpret_cast<const char*>(&v), sizeof(v));
+
+    mout.write(reinterpret_cast<const char*>(&dtype), sizeof(dtype));
+
+    mout.write(reinterpret_cast<const char*>(&dim), sizeof(dim));
+
+    for (int i = 1; i < dim; i++)
+    {
+        int rankW = model.params.W[i].dim();
+        int rankB = model.params.B[i].dim();
+
+        mout.write(reinterpret_cast<const char*>(&rankW), sizeof(rankW));
+        mout.write(reinterpret_cast<const char*>(&rankB), sizeof(rankB));
+
+        mout.write(reinterpret_cast<const char*>(model.params.W[i].getShape().data()), rankW * sizeof(int));
+        mout.write(reinterpret_cast<const char*>(model.params.B[i].getShape().data()), rankB * sizeof(int));
+
+        if (dtype == 0)
+        {
+            mout.write(reinterpret_cast<const char*>(model.params.W[i].toCPU().getFloatData()), model.params.W[i].byteSize());
+            mout.write(reinterpret_cast<const char*>(model.params.B[i].toCPU().getFloatData()), model.params.B[i].byteSize());
+        }
+        else
+        {
+            mout.write(reinterpret_cast<const char*>(model.params.W[i].toCPU().getIntData()), model.params.W[i].byteSize());
+            mout.write(reinterpret_cast<const char*>(model.params.B[i].toCPU().getIntData()), model.params.B[i].byteSize());
+        }
+    }
+
+    int nr_layers = model.cv_stats.size();
+
+    mout.write(reinterpret_cast<const char*>(&nr_layers), sizeof(nr_layers));
+
+    mout.write(reinterpret_cast<const char*>(model.cv_stats.data()), nr_layers * sizeof(convStats));
+
+    mout.write(reinterpret_cast<const char*>(model.mx_stats.data()), nr_layers * sizeof(MaxPoolStats));
+
+    uint32_t activ_length = model.activ.size();
+
+    mout.write(reinterpret_cast<const char*>(&activ_length), sizeof(activ_length));
+
+    mout.write(model.activ.data(), activ_length);
+
+    if (!mout)
+        throw runtime_error("Unable to finish file write!");
+}
+
+CNN_model load_cnn(const filesystem::path& path)
+{
+    ifstream min(path, ios::binary);
+
+    if (!min)
+        throw runtime_error("Unable to open read file!");
+
+    const char magic[4] = { 'F', 'L', 'C', 'T' };
+    char load_magic[4] = { 0 };
+
+    if (!(min.read(load_magic, sizeof(load_magic))))
+        throw runtime_error("Unable to read magic number!");
+
+    if (memcmp(load_magic, magic, 4))
+        throw runtime_error("Invalid file format!");
+
+    float v = 0.01f;
+    float load_v = 0.0f;
+
+    if (!(min.read(reinterpret_cast<char*>(&load_v), sizeof(load_v))))
+        throw runtime_error("Unable to read version number!");
+
+    if (load_v != v)
+        throw runtime_error("Invalid file version!");
+
+    int load_type = 0;
+
+    if (!(min.read(reinterpret_cast<char*>(&load_type), sizeof(load_type))))
+        throw runtime_error("Unable to load data type!");
+
+    DataType dtype = load_type == 0 ? DataType::float32 : DataType::int32;
+
+    int load_dim = 0;
+
+    if (!(min.read(reinterpret_cast<char*>(&load_dim), sizeof(load_dim))))
+        throw runtime_error("Unable to read total dimension!");
+
+    Parameters load_params(load_dim);
+
+    for (int i = 1; i < load_dim; i++)
+    {
+        int load_rankW = 0;
+        int load_rankB = 0;
+
+        if (!(min.read(reinterpret_cast<char*>(&load_rankW), sizeof(load_rankW))))
+            throw runtime_error("Unable to read W rank for Tensor " + to_string(i));
+
+        if (!(min.read(reinterpret_cast<char*>(&load_rankB), sizeof(load_rankB))))
+            throw runtime_error("Unable to read B rank for Tensor " + to_string(i));
+
+        vector<int> load_shapeW(load_rankW);
+        vector<int> load_shapeB(load_rankB);
+
+        if (!(min.read(reinterpret_cast<char*>(load_shapeW.data()), load_rankW * sizeof(int))))
+            throw runtime_error("Unable to read W shape for Tensor " + to_string(i));
+
+        if (!(min.read(reinterpret_cast<char*>(load_shapeB.data()), load_rankB * sizeof(int))))
+            throw runtime_error("Unable to read B shape for Tensor " + to_string(i));
+
+        Tensor load_W(load_shapeW, dtype);
+        Tensor load_B(load_shapeB, dtype);
+
+        if (dtype == DataType::float32)
+        {
+            vector<float> load_ploadW(load_W.size());
+            vector<float> load_ploadB(load_B.size());
+
+            if (!(min.read(reinterpret_cast<char*>(load_ploadW.data()), load_W.size() * sizeof(float))))
+                throw runtime_error("Unable to read W payload for Tensor " + to_string(i));
+
+            if (!(min.read(reinterpret_cast<char*>(load_ploadB.data()), load_B.size() * sizeof(float))))
+                throw runtime_error("Unable to read B payload for Tensor" + to_string(i));
+
+            load_W = load_ploadW;
+            load_B = load_ploadB;
+        }
+        else
+        {
+            vector<int> load_ploadW(load_W.size());
+            vector<int> load_ploadB(load_B.size());
+
+            if (!(min.read(reinterpret_cast<char*>(load_ploadW.data()), load_W.size() * sizeof(int))))
+                throw runtime_error("Unable to read W payload for Tensor " + to_string(i));
+
+            if (!(min.read(reinterpret_cast<char*>(load_ploadB.data()), load_B.size() * sizeof(int))))
+                throw runtime_error("Unable to read B payload for Tensor" + to_string(i));
+
+            load_W = load_ploadW;
+            load_B = load_ploadB;
+        }
+
+        load_params.W[i] = move(load_W);
+        load_params.B[i] = move(load_B);
+    }
+
+    int load_layer_nr = 0;
+
+    if (!(min.read(reinterpret_cast<char*>(&load_layer_nr), sizeof(load_layer_nr))))
+        throw runtime_error("Unable to read number of layers!");
+
+    vector<convStats> load_cv(load_layer_nr);
+
+    if (!(min.read(reinterpret_cast<char*>(load_cv.data()), load_layer_nr * sizeof(convStats))))
+        throw runtime_error("Unable to read conv stats!");
+
+    vector<MaxPoolStats> load_mx(load_layer_nr);
+
+    if (!(min.read(reinterpret_cast<char*>(load_mx.data()), load_layer_nr * sizeof(MaxPoolStats))))
+        throw runtime_error("Unbale to read max pool stats!");
+
+    uint32_t activ_length = 0;
+
+    if (!(min.read(reinterpret_cast<char*>(&activ_length), sizeof(activ_length))))
+        throw runtime_error("Unable to read activation string length!");
+
+    string load_activ(activ_length, '\0');
+
+    if (!(min.read(load_activ.data(), activ_length)))
+        throw runtime_error("Unable to read activation string!");
+
+    CNN_model load_model(load_params, load_cv, load_mx, load_activ);
+
+    return load_model;
+}
 
 // Compare metadata and payload.
 bool same_tensor(const Tensor& A, const Tensor& B)
@@ -513,6 +707,80 @@ bool compare_params(const Parameters& original,
     }
 
     std::cout << "\nOverall: "
+        << (all_match ? "PASS" : "FAIL") << '\n';
+
+    return all_match;
+}
+
+bool compare_cnn(const CNN_model& original,
+    const CNN_model& loaded)
+{
+    cout << "\nParameter comparison\n\n";
+
+    bool all_match = compare_params(
+        original.params,
+        loaded.params);
+
+    auto check = [&](const string& name, bool matches)
+        {
+            cout << name << ": "
+                << (matches ? "PASS" : "FAIL") << '\n';
+
+            all_match = all_match && matches;
+        };
+
+    cout << "\nModel configuration comparison\n\n";
+
+    check(
+        "Convolution configuration count",
+        original.cv_stats.size() == loaded.cv_stats.size());
+
+    for (size_t i = 0;
+        i < original.cv_stats.size() &&
+        i < loaded.cv_stats.size();
+        i++)
+    {
+        const auto& a = original.cv_stats[i];
+        const auto& b = loaded.cv_stats[i];
+
+        bool matches =
+            a.in_channels == b.in_channels &&
+            a.out_channels == b.out_channels &&
+            a.kernel_size == b.kernel_size &&
+            a.hStride == b.hStride &&
+            a.vStride == b.vStride &&
+            a.padding == b.padding;
+
+        check("Conv[" + to_string(i) + "]", matches);
+    }
+
+    check(
+        "Max-pool configuration count",
+        original.mx_stats.size() == loaded.mx_stats.size());
+
+    for (size_t i = 0;
+        i < original.mx_stats.size() &&
+        i < loaded.mx_stats.size();
+        i++)
+    {
+        const auto& a = original.mx_stats[i];
+        const auto& b = loaded.mx_stats[i];
+
+        bool matches =
+            a.kernel_size == b.kernel_size &&
+            a.hStride == b.hStride &&
+            a.vStride == b.vStride &&
+            a.padding == b.padding;
+
+        check("MaxPool[" + to_string(i) + "]", matches);
+    }
+
+    check("Activation", original.activ == loaded.activ);
+
+    cout << "Original activation: " << original.activ << '\n';
+    cout << "Loaded activation:   " << loaded.activ << '\n';
+
+    cout << "\nOverall CNN comparison: "
         << (all_match ? "PASS" : "FAIL") << '\n';
 
     return all_match;
@@ -1823,6 +2091,8 @@ int main()
 
         Parameters cnn_params_test1 = train_cnn(Img, Imgtest, Y_Img, Y_Imgtest, cv_stats1, mx_stats1, "relu", 0.001f, 1000, 100);
 
+        CNN_model model1(cnn_params_test1, cv_stats1, mx_stats1, "relu");
+
         cout << "\n\nSimple text Write + Read test";
         {
             ofstream out("test1.txt");
@@ -2081,11 +2351,19 @@ int main()
 
         cout << "\n\nModel bytes function write + read test\n\n";
 
-        save_model(cnn_params_test1, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test2.bin");
+        save_model(model1.params, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test2.bin");
 
         Parameters load_params = load_model("C:/Users/ASUS/Downloads/Fulcrum_save_tests/test2.bin");
 
-        compare_params(cnn_params_test1, load_params);
+        compare_params(model1.params, load_params);
+
+        cout << "\n\nFull model bytes function write + read test!\n\n";
+
+        save_cnn(model1, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test3.bin");
+
+        CNN_model load_model1 = load_cnn("C:/Users/ASUS/Downloads/Fulcrum_save_tests/test3.bin");
+
+        compare_cnn(model1, load_model1);
 
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
