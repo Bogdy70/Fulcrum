@@ -1409,6 +1409,88 @@ void predict(const CPUTensor& X_test, const CPUTensor& y_test, const Parameters&
     }
 }
 
+float choose_label(const Tensor& y, int idx)
+{
+    if (y.dim() != 2)
+        throw runtime_error("Tensor must be 2 dimensional!");
+
+    if (idx >= y.getShape()[1])
+        throw runtime_error("Invalid label index!");
+
+    if (y.getShape()[0] == 1)
+        return y.toCPU()(idx);
+
+    Tensor y_labels = Tensor::argmax(y, 0);
+
+    return y_labels.toCPU()(idx);
+}
+
+CPUTensor choose_img(const CPUTensor& X, int idx)
+{
+    if (X.dim() != 4)
+        throw runtime_error("Tensor must be 4 dimensional!");
+
+    if (idx >= X.getShape()[0])
+        throw runtime_error("Invalid image index!");
+
+    int actual_idx = idx * X.getStride()[0];
+
+    vector<int> new_shape;
+    new_shape.push_back(1);
+
+    for (int i = 1; i < X.getShape().size(); i++)
+    {
+        new_shape.push_back(X.getShape()[i]);
+    }
+
+    CPUTensor one_img(new_shape);
+
+    for (int i = 0; i < X.getShape()[1]; i++)
+    {
+        for (int j = 0; j < X.getShape()[2]; j++)
+        {
+            for (int k = 0; k < X.getShape()[3]; k++)
+            {
+                int one_idx = i * X.getStride()[1] + j * X.getStride()[2] + k * X.getStride()[3];
+                int the_idx = actual_idx + i * X.getStride()[1] + j * X.getStride()[2] + k * X.getStride()[3];
+
+                one_img(one_idx) = X(the_idx);
+            }
+        }
+    }
+
+    return one_img;
+}
+
+void predict_cnn(const CNN_model& model, const Tensor& X, const Tensor& y, int idx)
+{
+    CPUTensor one_img = choose_img(X.toCPU(), idx);
+
+    float label = choose_label(y, idx);
+
+    Forward frd_cache = conv_frdpass(model.params, one_img.toCUDA(), model.cv_stats, model.mx_stats, model.activ);
+
+    int L = static_cast<int>(model.params.W.size());
+
+    float prediction = 0.0f;
+
+    if (y.getShape()[0] == 1)
+    {
+        prediction = (frd_cache.A[L - 1] > 0.5f).toScalar();
+
+        string lbl = label == 0.0f ? "no-meteor" : "meteor";
+        string prd = prediction == 0.0f ? "no-meteor" : "meteor";
+
+        cout << "\nTruth: " << lbl << " ||| Pred: " << prd;
+    }
+    else
+    {
+        prediction = Tensor::argmax(frd_cache.A[L - 1], 0).toScalar();
+
+        cout << "\nTruth: " << label << " ||| Pred: " << prediction;
+    }
+}
+
 int main()
 {
     try
@@ -2367,33 +2449,7 @@ int main()
 
         cout << "\n\nJust some indexing test\n\n";
 
-        int choose_idx = 0;
-
-        int actual_idx = choose_idx * X_test_meteors.getStride()[0];
-
-        vector<int> some_shape;
-        some_shape.push_back(1);
-
-        for (int i = 1; i < X_test_meteors.getShape().size(); i++)
-        {
-            some_shape.push_back(X_test_meteors.getShape()[i]);
-        }
-
-        CPUTensor one_img_cnn(some_shape);
-
-        for (int i = 0; i < X_test_meteors.getShape()[1]; i++)
-        {
-            for (int j = 0; j < X_test_meteors.getShape()[2]; j++)
-            {
-                for (int k = 0; k < X_test_meteors.getShape()[3]; k++)
-                {
-                    int one_idx = i * X_test_meteors.getStride()[1] + j * X_test_meteors.getStride()[2] + k * X_test_meteors.getStride()[3];
-                    int the_idx = actual_idx + i * X_test_meteors.getStride()[1] + j * X_test_meteors.getStride()[2] + k * X_test_meteors.getStride()[3];
-
-                    one_img_cnn(one_idx) = X_test_meteors(the_idx);
-                }
-            }
-        }
+        CPUTensor one_img_cnn = choose_img(X_test_meteors, 7);
 
         cout << "\n(";
         for (int i = 0; i < one_img_cnn.dim(); i++)
@@ -2403,6 +2459,16 @@ int main()
                 cout << ", ";
         }
         cout << ")";
+
+        cout << "\n\nY print test\n\n";
+
+        printMnistImage(X_test_mnist, 7);
+
+        cout<<choose_label(y_test_mnist.toCUDA(), 7);
+
+        cout << "\n\nPrediction test\n\n";
+
+        predict_cnn(model1, Imgtest, Y_Imgtest, 2);
 
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
