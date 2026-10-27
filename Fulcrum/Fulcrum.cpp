@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <cstring>
 #include <cstdint>
+#include <algorithm>
 #include "Tensor.cuh"
 #include "CPUTensor.h"
 
@@ -1173,6 +1174,74 @@ Parameters train_cnn(const Tensor& Xtrain,
     }
 
     return cnn_params;
+}
+
+void save_cnn_image(
+    const CPUTensor& X,
+    int imgIdx,
+    const std::filesystem::path& path)
+{
+    const auto shape = X.getShape();
+
+    if (X.getDataType() != DataType::float32 ||
+        shape.size() != 4 || shape[1] != 3)
+    {
+        throw std::runtime_error(
+            "Expected float32 images shaped (batch, 3, H, W).");
+    }
+
+    if (imgIdx < 0 || imgIdx >= shape[0])
+        throw std::runtime_error("Image index out of range.");
+
+    const int H = shape[2];
+    const int W = shape[3];
+
+    if (H <= 0 || W <= 0)
+        throw std::runtime_error("Invalid image dimensions.");
+
+    const std::size_t plane = static_cast<std::size_t>(H) * W;
+    const std::size_t base = static_cast<std::size_t>(imgIdx) * 3 * plane;
+
+    const float* data = X.getFloatData();
+
+    std::ofstream out(path, std::ios::binary);
+
+    if (!out)
+        throw std::runtime_error("Cannot open image file.");
+
+    out << "P6\n" << W << ' ' << H << "\n255\n";
+
+    for (int y = 0; y < H; ++y)
+    {
+        for (int x = 0; x < W; ++x)
+        {
+            for (int c = 0; c < 3; ++c)
+            {
+                const std::size_t index =
+                    base + c * plane +
+                    static_cast<std::size_t>(y) * W + x;
+
+                const float value = data[index];
+
+                if (!std::isfinite(value))
+                    throw std::runtime_error(
+                        "Image contains a non-finite value.");
+
+                const auto pixel = static_cast<unsigned char>(
+                    std::lround(
+                        std::clamp(value, 0.0f, 1.0f) * 255.0f));
+
+                out.write(
+                    reinterpret_cast<const char*>(&pixel),
+                    sizeof(pixel));
+            }
+        }
+    }
+
+    out.close();
+
+    if (!out)
+        throw std::runtime_error("Failed to write image file.");
 }
 
 void numerical_gradient_test(
@@ -2468,7 +2537,9 @@ int main()
 
         cout << "\n\nPrediction test\n\n";
 
-        predict_cnn(model1, Imgtest, Y_Imgtest, 2);
+        predict_cnn(load_model1, Imgtest, Y_Imgtest, 2);
+
+        save_cnn_image(X_test_meteors, 7, "C:/Users/ASUS/Downloads/selected_meteor.ppm");
 
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
@@ -2484,6 +2555,28 @@ int main()
             {2, 2, 2, 0},
             {2, 2, 2, 0}
         };
+
+        {
+            cout << "Best config train run\n\n";
+
+            start = chrono::high_resolution_clock::now();
+
+            CPUTensor::setSeed(42);
+
+            Parameters params_best = train_cnn(X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), cv_meteors, mx_meteors, "relu", 0.001f, 120, 10, 0.0f, 0.0f, 0.1f);
+
+            cudaDeviceSynchronize();
+
+            end = chrono::high_resolution_clock::now();
+
+            elapsed = end - start;
+
+            cout << "\nTest1 Meteors training time: " << elapsed.count() << " seconds\n";
+
+            CNN_model model_meteors(params_best, cv_meteors, mx_meteors, "relu");
+
+            predict_cnn(model_meteors, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 7);
+        }
 
         {
             cout << "Test1: all 0\n\n";
