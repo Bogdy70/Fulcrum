@@ -400,6 +400,8 @@ struct AdamState
     vector<Tensor> SdB;
     int t = 0;
 
+    //AdamState(vector<Tensor>& vdw, vector<Tensor>& vdb, vector<Tensor>& sdw, vector<Tensor>& sdb, const int t): VdW(move(vdw)), VdB(move(vdb)), SdW(move(sdw)), SdB(move(sdb)), t(t) {}
+    
     AdamState(const Parameters& params) : VdW(size(params.W)), VdB(size(params.B)), SdW(size(params.W)), SdB(size(params.B))
     {
         int L = size(params.W);
@@ -453,11 +455,14 @@ struct CNN_model
     vector<convStats> cv_stats;
     vector<MaxPoolStats> mx_stats;
     string activ;
+    AdamState state;
 
-    CNN_model(Parameters& prm, const vector<convStats>& cv, const vector<MaxPoolStats>& mx, const string& act): params(move(prm)), cv_stats(cv), mx_stats(mx), activ(act) {}
+    CNN_model(Parameters& prm, const vector<convStats>& cv, const vector<MaxPoolStats>& mx, const string& act): params(move(prm)), cv_stats(cv), mx_stats(mx), activ(act), state(params) {}
+
+    CNN_model(Parameters& prm, const vector<convStats>& cv, const vector<MaxPoolStats>& mx, const string& act, AdamState& stt): params(move(prm)), cv_stats(cv), mx_stats(mx), activ(act), state(move(stt)) {}
 };
 
-void save_cnn(const CNN_model& model, const filesystem::path& path)
+void save_cnn(const CNN_model& model, const filesystem::path& path, bool save_adam = false)
 {
     ofstream mout(path, ios::binary | ios::trunc);
 
@@ -514,11 +519,55 @@ void save_cnn(const CNN_model& model, const filesystem::path& path)
 
     mout.write(model.activ.data(), activ_length);
 
+    if (save_adam)
+    {
+        bool has_adam = true;
+
+        mout.write(reinterpret_cast<const char*>(&has_adam), sizeof(has_adam));
+
+        for (int i = 1; i < dim; i++)
+        {
+            int rankvdw = model.state.VdW[i].dim();
+            int rankvdb = model.state.VdB[i].dim();
+            int ranksdw = model.state.SdW[i].dim();
+            int ranksdb = model.state.SdB[i].dim();
+
+            mout.write(reinterpret_cast<const char*>(&rankvdw), sizeof(rankvdw));
+            mout.write(reinterpret_cast<const char*>(&rankvdb), sizeof(rankvdb));
+            mout.write(reinterpret_cast<const char*>(&ranksdw), sizeof(ranksdw));
+            mout.write(reinterpret_cast<const char*>(&ranksdb), sizeof(ranksdb));
+
+            mout.write(reinterpret_cast<const char*>(model.state.VdW[i].getShape().data()), rankvdw * sizeof(int));
+            mout.write(reinterpret_cast<const char*>(model.state.VdB[i].getShape().data()), rankvdb * sizeof(int));
+            mout.write(reinterpret_cast<const char*>(model.state.SdB[i].getShape().data()), ranksdw * sizeof(int));
+            mout.write(reinterpret_cast<const char*>(model.state.SdB[i].getShape().data()), ranksdb * sizeof(int));
+
+            if (dtype == 0)
+            {
+                mout.write(reinterpret_cast<const char*>(model.state.VdW[i].toCPU().getFloatData()), model.state.VdW[i].byteSize());
+                mout.write(reinterpret_cast<const char*>(model.state.VdB[i].toCPU().getFloatData()), model.state.VdB[i].byteSize());
+                mout.write(reinterpret_cast<const char*>(model.state.SdW[i].toCPU().getFloatData()), model.state.SdW[i].byteSize());
+                mout.write(reinterpret_cast<const char*>(model.state.SdB[i].toCPU().getFloatData()), model.state.SdB[i].byteSize());
+            }
+            else
+            {
+                mout.write(reinterpret_cast<const char*>(model.state.VdW[i].toCPU().getIntData()), model.state.VdW[i].byteSize());
+                mout.write(reinterpret_cast<const char*>(model.state.VdB[i].toCPU().getIntData()), model.state.VdB[i].byteSize());
+                mout.write(reinterpret_cast<const char*>(model.state.SdW[i].toCPU().getIntData()), model.state.SdW[i].byteSize());
+                mout.write(reinterpret_cast<const char*>(model.state.SdB[i].toCPU().getIntData()), model.state.SdB[i].byteSize());
+            }
+        }
+
+        int t = model.state.t;
+
+        mout.write(reinterpret_cast<const char*>(&t), sizeof(t));
+    }
+
     if (!mout)
         throw runtime_error("Unable to finish file write!");
 }
 
-CNN_model load_cnn(const filesystem::path& path)
+CNN_model load_cnn(const filesystem::path& path, bool restore_adam = false)
 {
     ifstream min(path, ios::binary);
 
@@ -637,6 +686,128 @@ CNN_model load_cnn(const filesystem::path& path)
 
     if (!(min.read(load_activ.data(), activ_length)))
         throw runtime_error("Unable to read activation string!");
+
+    if (restore_adam)
+    {
+        bool load_has_adam = false;
+
+        if (!(min.read(reinterpret_cast<char*>(&load_has_adam), sizeof(load_has_adam))))
+            throw runtime_error("Unable to read adam confirmation variable!");
+
+        if (load_has_adam)
+        {
+            AdamState load_state(load_params);
+
+            for (int i = 1; i < load_dim; i++)
+            {
+                int load_rankvdw = 0;
+                int load_rankvdb = 0;
+                int load_ranksdw = 0;
+                int load_ranksdb = 0;
+
+                if (!(min.read(reinterpret_cast<char*>(&load_rankvdw), sizeof(load_rankvdw))))
+                    throw runtime_error("Unable to read the rank for VdW Tensor " + to_string(i));
+
+                if (!(min.read(reinterpret_cast<char*>(&load_rankvdb), sizeof(load_rankvdb))))
+                    throw runtime_error("Unable to read the rank for VdB Tensor " + to_string(i));
+
+                if (!(min.read(reinterpret_cast<char*>(&load_ranksdw), sizeof(load_ranksdw))))
+                    throw runtime_error("Unable to read the rank for SdW Tensor " + to_string(i));
+
+                if (!(min.read(reinterpret_cast<char*>(&load_ranksdb), sizeof(load_ranksdb))))
+                    throw runtime_error("Unable to read the rank for SdB Tensor " + to_string(i));
+
+                vector<int> load_shapevdw(load_rankvdw);
+                vector<int> load_shapevdb(load_rankvdb);
+                vector<int> load_shapesdw(load_ranksdw);
+                vector<int> load_shapesdb(load_ranksdb);
+
+                if (!(min.read(reinterpret_cast<char*>(load_shapevdw.data()), load_rankvdw * sizeof(int))))
+                    throw runtime_error("Unable to read the shape for VdW Tensor " + to_string(i));
+
+                if (!(min.read(reinterpret_cast<char*>(load_shapevdb.data()), load_rankvdb * sizeof(int))))
+                    throw runtime_error("Unable to read the shape for VdB Tensor " + to_string(i));
+
+                if (!(min.read(reinterpret_cast<char*>(load_shapesdw.data()), load_ranksdw * sizeof(int))))
+                    throw runtime_error("Unable to read the shape for SdW Tensor " + to_string(i));
+
+                if (!(min.read(reinterpret_cast<char*>(load_shapesdb.data()), load_ranksdb * sizeof(int))))
+                    throw runtime_error("Unable to read the shape for SdB Tensor " + to_string(i));
+
+                Tensor loadvdw(load_shapevdw, dtype);
+                Tensor loadvdb(load_shapevdb, dtype);
+                Tensor loadsdw(load_shapesdw, dtype);
+                Tensor loadsdb(load_shapesdb, dtype);
+
+                if (dtype == DataType::float32)
+                {
+                    vector<float> load_ploadvdw(loadvdw.size());
+                    vector<float> load_ploadvdb(loadvdb.size());
+                    vector<float> load_ploadsdw(loadsdw.size());
+                    vector<float> load_ploadsdb(loadsdb.size());
+
+                    if (!(min.read(reinterpret_cast<char*>(load_ploadvdw.data()), loadvdw.size() * sizeof(float))))
+                        throw runtime_error("Unable to read the payload for VdW Tensor " + to_string(i));
+
+                    if (!(min.read(reinterpret_cast<char*>(load_ploadvdb.data()), loadvdb.size() * sizeof(float))))
+                        throw runtime_error("Unable to read the payload for VdB Tensor" + to_string(i));
+
+                    if (!(min.read(reinterpret_cast<char*>(load_ploadsdw.data()), loadsdw.size() * sizeof(float))))
+                        throw runtime_error("Unable to read the payload for SdW Tensor " + to_string(i));
+
+                    if (!(min.read(reinterpret_cast<char*>(load_ploadsdb.data()), loadsdb.size() * sizeof(float))))
+                        throw runtime_error("Unable to read the payload for SdB Tensor " + to_string(i));
+
+                    loadvdw = load_ploadvdw;
+                    loadvdb = load_ploadvdb;
+                    loadsdw = load_ploadsdw;
+                    loadsdb = load_ploadsdb;
+                }
+                else
+                {
+                    vector<int> load_ploadvdw(loadvdw.size());
+                    vector<int> load_ploadvdb(loadvdb.size());
+                    vector<int> load_ploadsdw(loadsdw.size());
+                    vector<int> load_ploadsdb(loadsdb.size());
+
+                    if (!(min.read(reinterpret_cast<char*>(load_ploadvdw.data()), loadvdw.size() * sizeof(int))))
+                        throw runtime_error("Unable to read the payload for VdW Tensor " + to_string(i));
+
+                    if (!(min.read(reinterpret_cast<char*>(load_ploadvdb.data()), loadvdb.size() * sizeof(int))))
+                        throw runtime_error("Unable to read the payload for VdB Tensor" + to_string(i));
+
+                    if (!(min.read(reinterpret_cast<char*>(load_ploadsdw.data()), loadsdw.size() * sizeof(int))))
+                        throw runtime_error("Unable to read the payload for SdW Tensor " + to_string(i));
+
+                    if (!(min.read(reinterpret_cast<char*>(load_ploadsdb.data()), loadsdb.size() * sizeof(int))))
+                        throw runtime_error("Unable to read the payload for SdB Tensor " + to_string(i));
+
+                    loadvdw = load_ploadvdw;
+                    loadvdb = load_ploadvdb;
+                    loadsdw = load_ploadsdw;
+                    loadsdb = load_ploadsdb;
+                }
+
+                load_state.VdW[i] = move(loadvdw);
+                load_state.VdB[i] = move(loadvdb);
+                load_state.SdW[i] = move(loadsdw);
+                load_state.SdB[i] = move(loadsdb);
+            }
+
+            int load_t = 0;
+
+            if (!(min.read(reinterpret_cast<char*>(&load_t), sizeof(int))))
+                throw runtime_error("Unable to load adam t variable!");
+
+            load_state.t = load_t;
+
+            CNN_model load_model(load_params, load_cv, load_mx, load_activ, load_state);
+
+            return load_model;
+        }
+        else
+            throw runtime_error("The file does not have a saved adam state!");
+    }
 
     CNN_model load_model(load_params, load_cv, load_mx, load_activ);
 
@@ -1121,13 +1292,11 @@ Parameters train(const Tensor& X_train,
     return params;
 }
 
-Parameters train_cnn(const Tensor& Xtrain,
+CNN_model& train_cnn(CNN_model& model,
+    const Tensor& Xtrain,
     const Tensor& Xtest,
     const Tensor& ytrain,
     const Tensor& ytest,
-    const vector<convStats>& cv_stats,
-    const vector<MaxPoolStats>& mx_stats,
-    const string& activation,
     float lr,
     int epochs,
     int viewing_rate,
@@ -1138,9 +1307,6 @@ Parameters train_cnn(const Tensor& Xtrain,
     float beta2 = 0.999f,
     float eps = 1e-8f)
 {
-    Parameters cnn_params = init_conv(cv_stats, mx_stats, Xtrain, ytrain.getShape()[0], activation);
-    AdamState cnn_adam(cnn_params);
-
     auto start_time = chrono::high_resolution_clock::now();
 
     for (int epoch = 0; epoch <= epochs; epoch++)
@@ -1149,15 +1315,15 @@ Parameters train_cnn(const Tensor& Xtrain,
         {
             cudaDeviceSynchronize();
 
-            Forward train_frd_cache = conv_frdpass(cnn_params, Xtrain, cv_stats, mx_stats, activation);
-            Forward test_frd_cache = conv_frdpass(cnn_params, Xtest, cv_stats, mx_stats, activation);
+            Forward train_frd_cache = conv_frdpass(model.params, Xtrain, model.cv_stats, model.mx_stats, model.activ);
+            Forward test_frd_cache = conv_frdpass(model.params, Xtest, model.cv_stats, model.mx_stats, model.activ);
 
-            float train_objective = cost(ytrain, train_frd_cache.A[size(cnn_params.W) - 1], cnn_params, lambda_l1, lambda_l2);
-            float train_cost = cost(ytrain, train_frd_cache.A[size(cnn_params.W) - 1], cnn_params);
-            float train_accuracy = accuracy(ytrain, train_frd_cache.A[size(cnn_params.W) - 1]);
+            float train_objective = cost(ytrain, train_frd_cache.A[size(model.params.W) - 1], model.params, lambda_l1, lambda_l2);
+            float train_cost = cost(ytrain, train_frd_cache.A[size(model.params.W) - 1], model.params);
+            float train_accuracy = accuracy(ytrain, train_frd_cache.A[size(model.params.W) - 1]);
 
-            float test_cost = cost(ytest, test_frd_cache.A[size(cnn_params.W) - 1], cnn_params);
-            float test_accuracy = accuracy(ytest, test_frd_cache.A[size(cnn_params.W) - 1]);
+            float test_cost = cost(ytest, test_frd_cache.A[size(model.params.W) - 1], model.params);
+            float test_accuracy = accuracy(ytest, test_frd_cache.A[size(model.params.W) - 1]);
 
             auto current_time = chrono::high_resolution_clock::now();
             chrono::duration<double> time = current_time - start_time;
@@ -1168,12 +1334,12 @@ Parameters train_cnn(const Tensor& Xtrain,
         if (epoch == epochs)
             break;
 
-        Forward cnn_frd_cache = conv_frdpass(cnn_params, Xtrain, cv_stats, mx_stats, activation, dropout);
-        Backward cnn_grads = conv_bckprop(cnn_frd_cache, cnn_params, ytrain, cv_stats, mx_stats, activation, dropout, lambda_l1, lambda_l2);
-        adam(cnn_params, cnn_grads, cnn_adam, lr, beta1, beta2, eps);
+        Forward cnn_frd_cache = conv_frdpass(model.params, Xtrain, model.cv_stats, model.mx_stats, model.activ, dropout);
+        Backward cnn_grads = conv_bckprop(cnn_frd_cache, model.params, ytrain, model.cv_stats, model.mx_stats, model.activ, dropout, lambda_l1, lambda_l2);
+        adam(model.params, cnn_grads, model.state, lr, beta1, beta2, eps);
     }
 
-    return cnn_params;
+    return model;
 }
 
 void save_cnn_image(
@@ -2235,14 +2401,16 @@ int main()
                     ? "MATCH" : "MISMATCH")
                 << "\n";
         }
-        cnn_params = move(adam(cnn_params, cnn_grads, cnn_adam1, 0.01f, 0.9f, 0.999f, 1e-8f));
+        adam(cnn_params, cnn_grads, cnn_adam1, 0.01f, 0.9f, 0.999f, 1e-8f);
 
         Tensor Imgtest = Img.clone();
         Tensor Y_Imgtest = Y_Img.clone();
 
-        Parameters cnn_params_test1 = train_cnn(Img, Imgtest, Y_Img, Y_Imgtest, cv_stats1, mx_stats1, "relu", 0.001f, 1000, 100);
+        Parameters cnn_params_test1 = init_conv(cv_stats1, mx_stats1, Img, Y_Img.getShape()[0], "relu");
+        AdamState cnn_state_test1(cnn_params_test1);
+        CNN_model cnn_model_test1(cnn_params_test1, cv_stats1, mx_stats1, "relu", cnn_state_test1);
 
-        CNN_model model1(cnn_params_test1, cv_stats1, mx_stats1, "relu");
+        train_cnn(cnn_model_test1, Img, Imgtest, Y_Img, Y_Imgtest, 0.001f, 1000, 100);
 
         cout << "\n\nSimple text Write + Read test";
         {
@@ -2502,19 +2670,19 @@ int main()
 
         cout << "\n\nModel bytes function write + read test\n\n";
 
-        save_model(model1.params, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test2.bin");
+        save_model(cnn_model_test1.params, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test2.bin");
 
         Parameters load_params = load_model("C:/Users/ASUS/Downloads/Fulcrum_save_tests/test2.bin");
 
-        compare_params(model1.params, load_params);
+        compare_params(cnn_model_test1.params, load_params);
 
         cout << "\n\nFull model bytes function write + read test!\n\n";
 
-        save_cnn(model1, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test3.bin");
+        save_cnn(cnn_model_test1, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/test3.bin");
 
         CNN_model load_model1 = load_cnn("C:/Users/ASUS/Downloads/Fulcrum_save_tests/test3.bin");
 
-        compare_cnn(model1, load_model1);
+        compare_cnn(cnn_model_test1, load_model1);
 
         cout << "\n\nJust some indexing test\n\n";
 
@@ -2563,7 +2731,11 @@ int main()
 
             CPUTensor::setSeed(42);
 
-            Parameters params_best = train_cnn(X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), cv_meteors, mx_meteors, "relu", 0.001f, 120, 10, 0.0f, 0.0f, 0.1f);
+            Parameters params_best = init_conv(cv_meteors, mx_meteors, X_train_meteors.toCUDA(), y_train_meteors.getShape()[0], "relu");
+            AdamState state_best(params_best);
+            CNN_model model_best(params_best, cv_meteors, mx_meteors, "relu", state_best);
+
+            train_cnn(model_best, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 110, 10, 0.0f, 0.0f, 0.1f);
 
             cudaDeviceSynchronize();
 
@@ -2573,9 +2745,9 @@ int main()
 
             cout << "\nTest1 Meteors training time: " << elapsed.count() << " seconds\n";
 
-            CNN_model model_meteors(params_best, cv_meteors, mx_meteors, "relu");
+            predict_cnn(model_best, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 7);
 
-            predict_cnn(model_meteors, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 7);
+            cout << "\n\n";
         }
 
         {
@@ -2585,7 +2757,11 @@ int main()
 
             CPUTensor::setSeed(42);
 
-            train_cnn(X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), cv_meteors, mx_meteors, "relu", 0.001f, 150, 17);
+            Parameters params_test1 = init_conv(cv_meteors, mx_meteors, X_train_meteors.toCUDA(), y_train_meteors.getShape()[0], "relu");
+            AdamState state1(params_test1);
+            CNN_model model1(params_test1, cv_meteors, mx_meteors, "relu", state1);
+
+            train_cnn(model1, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17);
 
             cudaDeviceSynchronize();
 
@@ -2603,7 +2779,11 @@ int main()
 
             CPUTensor::setSeed(42);
 
-            train_cnn(X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), cv_meteors, mx_meteors, "relu", 0.001f, 150, 17, 0.2f);
+            Parameters params_test2 = init_conv(cv_meteors, mx_meteors, X_train_meteors.toCUDA(), y_train_meteors.getShape()[0], "relu");
+            AdamState state2(params_test2);
+            CNN_model model2(params_test2, cv_meteors, mx_meteors, "relu", state2);
+
+            train_cnn(model2, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.2f);
 
             cudaDeviceSynchronize();
 
@@ -2621,7 +2801,11 @@ int main()
 
             CPUTensor::setSeed(42);
 
-            train_cnn(X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), cv_meteors, mx_meteors, "relu", 0.001f, 150, 17, 0.0f, 0.0f, 0.1f);
+            Parameters params_test3 = init_conv(cv_meteors, mx_meteors, X_train_meteors.toCUDA(), y_train_meteors.getShape()[0], "relu");
+            AdamState state3(params_test3);
+            CNN_model model3(params_test3, cv_meteors, mx_meteors, "relu", state3);
+
+            train_cnn(model3, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.0f, 0.0f, 0.1f);
 
             cudaDeviceSynchronize();
 
@@ -2639,7 +2823,11 @@ int main()
 
             CPUTensor::setSeed(42);
 
-            train_cnn(X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), cv_meteors, mx_meteors, "relu", 0.001f, 150, 17, 0.2f, 0.0f, 0.1f);
+            Parameters params_test4 = init_conv(cv_meteors, mx_meteors, X_train_meteors.toCUDA(), y_train_meteors.getShape()[0], "relu");
+            AdamState state4(params_test4);
+            CNN_model model4(params_test4, cv_meteors, mx_meteors, "relu", state4);
+
+            train_cnn(model4, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.2f, 0.0f, 0.1f);
 
             cudaDeviceSynchronize();
 
@@ -2657,7 +2845,11 @@ int main()
 
             CPUTensor::setSeed(42);
 
-            train_cnn(X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), cv_meteors, mx_meteors, "tanh", 0.001f, 150, 17);
+            Parameters params_test5 = init_conv(cv_meteors, mx_meteors, X_train_meteors.toCUDA(), y_train_meteors.getShape()[0], "tanh");
+            AdamState state5(params_test5);
+            CNN_model model5(params_test5, cv_meteors, mx_meteors, "tanh", state5);
+
+            train_cnn(model5, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17);
 
             cudaDeviceSynchronize();
 
@@ -2675,7 +2867,11 @@ int main()
 
             CPUTensor::setSeed(42);
 
-            train_cnn(X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), cv_meteors, mx_meteors, "tanh", 0.001f, 150, 17, 0.2f);
+            Parameters params_test6 = init_conv(cv_meteors, mx_meteors, X_train_meteors.toCUDA(), y_train_meteors.getShape()[0], "tanh");
+            AdamState state6(params_test6);
+            CNN_model model6(params_test6, cv_meteors, mx_meteors, "tanh", state6);
+
+            train_cnn(model6, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.2f);
 
             cudaDeviceSynchronize();
 
@@ -2693,7 +2889,11 @@ int main()
 
             CPUTensor::setSeed(42);
 
-            train_cnn(X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), cv_meteors, mx_meteors, "tanh", 0.001f, 150, 17, 0.0f, 0.0f, 0.1f);
+            Parameters params_test7 = init_conv(cv_meteors, mx_meteors, X_train_meteors.toCUDA(), y_train_meteors.getShape()[0], "tanh");
+            AdamState state7(params_test7);
+            CNN_model model7(params_test7, cv_meteors, mx_meteors, "tanh", state7);
+
+            train_cnn(model7, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.0f, 0.0f, 0.1f);
 
             cudaDeviceSynchronize();
 
@@ -2711,7 +2911,11 @@ int main()
 
             CPUTensor::setSeed(42);
 
-            train_cnn(X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), cv_meteors, mx_meteors, "tanh", 0.001f, 150, 17, 0.2f, 0.0f, 0.1f);
+            Parameters params_test8 = init_conv(cv_meteors, mx_meteors, X_train_meteors.toCUDA(), y_train_meteors.getShape()[0], "tanh");
+            AdamState state8(params_test8);
+            CNN_model model8(params_test8, cv_meteors, mx_meteors, "tanh", state8);
+
+            train_cnn(model8, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.2f, 0.0f, 0.1f);
 
             cudaDeviceSynchronize();
 
@@ -2739,7 +2943,11 @@ int main()
             {2, 2, 2, 0}
         };
 
-        Parameters cnn_params_test11 = train_cnn(X_train_cnn.toCUDA(), X_test_cnn.toCUDA(), y_train_cnn.toCUDA(), y_test_cnn.toCUDA(), cv_cnn, mx_cnn, "relu", 0.001f, 1000, 100);
+        Parameters cnn_params_cifar10 = init_conv(cv_cnn, mx_cnn, X_train_cnn.toCUDA(), y_train_cnn.getShape()[0], "relu");
+        AdamState cnn_state_cifar10(cnn_params_cifar10);
+        CNN_model cnn_model_cifar10(cnn_params_cifar10, cv_cnn, mx_cnn, "relu", cnn_state_cifar10);
+
+        train_cnn(cnn_model_cifar10, X_train_cnn.toCUDA(), X_test_cnn.toCUDA(), y_train_cnn.toCUDA(), y_test_cnn.toCUDA(), 0.001f, 1000, 100);
 
         cudaDeviceSynchronize();
 
