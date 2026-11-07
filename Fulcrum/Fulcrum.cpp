@@ -1303,6 +1303,7 @@ CNN_model& train_cnn(CNN_model& model,
     float dropout = 0.0f,
     float lambda_l1 = 0.0f,
     float lambda_l2 = 0.0f,
+    bool early_stopping = false,
     float beta1 = 0.9f,
     float beta2 = 0.999f,
     float eps = 1e-8f)
@@ -1338,6 +1339,45 @@ CNN_model& train_cnn(CNN_model& model,
         Backward cnn_grads = conv_bckprop(cnn_frd_cache, model.params, ytrain, model.cv_stats, model.mx_stats, model.activ, dropout, lambda_l1, lambda_l2);
         adam(model.params, cnn_grads, model.state, lr, beta1, beta2, eps);
     }
+
+    return model;
+}
+
+CNN_model& change_params(CNN_model& model)
+{
+    Tensor Replace = Tensor::fill(model.params.W[1].getShape(), 1.0f);
+
+    model.params.W[1] = Replace.clone();
+
+    return model;
+}
+
+Parameters clone_params(const Parameters& params)
+{
+    Parameters newparams(params.W.size());
+
+    for (int i = 1; i < params.W.size(); i++)
+    {
+        newparams.W[i] = params.W[i].clone();
+        newparams.B[i] = params.B[i].clone();
+    }
+
+    return newparams;
+}
+
+CNN_model& change_params2(CNN_model& model)
+{
+    Parameters best_params(model.params.W.size());
+
+    best_params = clone_params(model.params);
+
+    CPUTensor temp = best_params.W[1].toCPU();
+
+    temp(7) = 7.7f;
+
+    best_params.W[1] = temp.toCUDA().clone();
+
+    model.params = clone_params(best_params);
 
     return model;
 }
@@ -2708,6 +2748,22 @@ int main()
         predict_cnn(load_model1, Imgtest, Y_Imgtest, 2);
 
         save_cnn_image(X_test_meteors, 7, "C:/Users/ASUS/Downloads/selected_meteor.ppm");
+
+        cout << "\n\nParams copy test\n\n";
+
+        cout << load_model1.params.W[1].toCPU()(7) << "\n\n";
+
+        change_params(load_model1);
+
+        cout << load_model1.params.W[1].toCPU()(7) << "\n\n";
+
+        cout << "\n\nParams copy test2\n\n";
+
+        cout << load_model1.params.W[1].toCPU()(7) << "\n\n";
+
+        change_params2(load_model1);
+
+        cout << load_model1.params.W[1].toCPU()(7) << "\n\n";
 
 
         cout << "\n\nCUDA Meteors dataset test\n\n";

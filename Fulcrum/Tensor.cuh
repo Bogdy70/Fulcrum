@@ -49,7 +49,7 @@ public:
 	Tensor(const vector<int>& shape, DataType dtype = DataType::float32);
 
 	~Tensor();
-
+	
 	Tensor(const Tensor&) = delete;
 	Tensor& operator=(const Tensor&) = delete;
 

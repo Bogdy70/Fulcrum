@@ -97,12 +97,12 @@ CPUTensor::CPUTensor(const vector<int>& shape, DataType dtype) : data(), shape(s
 
 float& CPUTensor::operator()(int index)
 {
-	return data.f[index];
+	return data.f.at(index);
 }
 
 const float& CPUTensor::operator()(int index) const
 {
-	return data.f[index];
+	return data.f.at(index);
 }
 
 float* CPUTensor::getFloatData()
