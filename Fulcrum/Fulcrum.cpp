@@ -1322,6 +1322,8 @@ CNN_model& train_cnn(CNN_model& model,
     bool early_stopping = false,
     int patience = 3,
     int min_epochs = 10,
+    float target_loss = 0.0f,
+    float target_tolerance = 0.0f,
     float beta1 = 0.9f,
     float beta2 = 0.999f,
     float eps = 1e-8f)
@@ -1350,7 +1352,7 @@ CNN_model& train_cnn(CNN_model& model,
             Forward test_frd_cache = conv_frdpass(model.params, Xtest, model.cv_stats, model.mx_stats, model.activ);
             float test_cost = cost(ytest, test_frd_cache.A[size(model.params.W) - 1], model.params);
 
-            if (restore_best!=0 && test_cost <= reference_cost_best)
+            if (restore_best!=0 && target_loss==0 && test_cost <= reference_cost_best)
             {
                 reference_cost_best = test_cost;
                 best_params = clone_params(model.params);
@@ -1358,21 +1360,32 @@ CNN_model& train_cnn(CNN_model& model,
             }
             if (early_stopping != 0 && epoch >= min_epochs)
             {
-                if (test_cost <= reference_cost - min_delta)
+                if (target_loss != 0)
                 {
-                    counter = 0;
-                    reference_cost = test_cost;
-                    if (restore_meaningful != 0)
-                    {
-                        best_params = clone_params(model.params);
-                        snapshot = true;
-                    }
+                    if (test_cost <= target_loss + target_tolerance)
+                        break;
                 }
                 else
                 {
-                    counter++;
-                    if (counter >= patience)
-                        break;
+                    if (test_cost < reference_cost - min_delta)
+                    {
+                        counter = 0;
+                        reference_cost = test_cost;
+                        if (restore_meaningful != 0)
+                        {
+                            best_params = clone_params(model.params);
+                            snapshot = true;
+                        }
+                    }
+                    else
+                    {
+                        counter++;
+                        if (counter >= patience)
+                        {
+                            cout << "Epoch: " << epoch << " || Cost: " << test_cost << " || Ref: " << reference_cost << " || Counter: " << counter << "\n";
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -2836,6 +2849,50 @@ int main()
         };
 
         {
+            cout << "Early stopping / restore best / target loss test\n\n";
+
+            vector<convStats> cv_cnn = {
+            {3, 8, 3, 1, 1, 1},
+            {8, 16, 3, 1, 1, 1}
+            };
+
+            vector<MaxPoolStats> mx_cnn = {
+                {2, 2, 2, 0},
+                {2, 2, 2, 0}
+            };
+
+            start = chrono::high_resolution_clock::now();
+
+            CPUTensor::setSeed(42);
+
+            Parameters params_stopping = init_conv(cv_cnn, mx_cnn, X_train_cnn.toCUDA(), y_train_cnn.getShape()[0], "relu");
+            AdamState state_stopping(params_stopping);
+            CNN_model model_stopping(params_stopping, cv_cnn, mx_cnn, "relu", state_stopping);
+
+            train_cnn(model_stopping, X_train_cnn.toCUDA(), X_test_cnn.toCUDA(), y_train_cnn.toCUDA(), y_test_cnn.toCUDA(), 0.001f, 120, 10, 0.0f, 0.0f, 0.1f, false, false, 0.001f, true, 3, 10, 1.70f, 0.01f);
+
+            cudaDeviceSynchronize();
+
+            Forward eval = conv_frdpass(model_stopping.params, X_test_cnn.toCUDA(), model_stopping.cv_stats, model_stopping.mx_stats, model_stopping.activ);
+
+            float returned_cost = cost(y_test_cnn.toCUDA(), eval.A[model_stopping.params.W.size() - 1], model_stopping.params);
+
+            cudaDeviceSynchronize();
+
+            cout << "Returned model cost: " << returned_cost << '\n';
+
+            end = chrono::high_resolution_clock::now();
+
+            elapsed = end - start;
+
+            cout << "\nEarly stopping training time: " << elapsed.count() << " seconds\n";
+
+            predict_cnn(model_stopping, X_test_cnn.toCUDA(), y_test_cnn.toCUDA(), 7);
+
+            cout << "\n\n";
+        }
+
+        {
             cout << "Best config train run\n\n";
 
             start = chrono::high_resolution_clock::now();
@@ -2854,7 +2911,7 @@ int main()
 
             elapsed = end - start;
 
-            cout << "\nTest1 Meteors training time: " << elapsed.count() << " seconds\n";
+            cout << "\nBest config Meteors training time: " << elapsed.count() << " seconds\n";
 
             predict_cnn(model_best, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 7);
 
