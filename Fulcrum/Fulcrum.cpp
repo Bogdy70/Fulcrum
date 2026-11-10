@@ -1328,17 +1328,24 @@ CNN_model& train_cnn(CNN_model& model,
 {
     auto start_time = chrono::high_resolution_clock::now();
 
-    if (restore_best != 0 && restore_meaningful != 0)
-        throw runtime_error("Only one restore option can be selected!");
+    if (early_stopping != 0)
+    {
+        if(min_epochs > epochs)
+            throw runtime_error("The minimum nimber of epochs cannot be higher than the maximum number!");
 
-    float reference_cost = 100.0f;
-    float reference_cost_best = 100.0f;
+        if (restore_best != 0 && restore_meaningful != 0)
+            throw runtime_error("Only one restore option can be selected!");
+    }
+
+    float reference_cost = numeric_limits<float>::infinity();
+    float reference_cost_best = numeric_limits<float>::infinity();
     Parameters best_params(model.params.W.size());
     int counter = 0;
+    bool snapshot = false;
 
     for (int epoch = 0; epoch <= epochs; epoch++)
     {
-        if ((restore_best != 0 || early_stopping != 0) && epoch >= min_epochs)
+        if (restore_best != 0 || early_stopping != 0)
         {
             Forward test_frd_cache = conv_frdpass(model.params, Xtest, model.cv_stats, model.mx_stats, model.activ);
             float test_cost = cost(ytest, test_frd_cache.A[size(model.params.W) - 1], model.params);
@@ -1347,15 +1354,19 @@ CNN_model& train_cnn(CNN_model& model,
             {
                 reference_cost_best = test_cost;
                 best_params = clone_params(model.params);
+                snapshot = true;
             }
-            if (early_stopping != 0)
+            if (early_stopping != 0 && epoch >= min_epochs)
             {
                 if (test_cost <= reference_cost - min_delta)
                 {
                     counter = 0;
                     reference_cost = test_cost;
                     if (restore_meaningful != 0)
+                    {
                         best_params = clone_params(model.params);
+                        snapshot = true;
+                    }
                 }
                 else
                 {
@@ -1394,7 +1405,7 @@ CNN_model& train_cnn(CNN_model& model,
         adam(model.params, cnn_grads, model.state, lr, beta1, beta2, eps);
     }
 
-    if ((restore_best != 0 && reference_cost_best < 100) || (restore_meaningful != 0 && reference_cost < 100))
+    if ((restore_best != 0 || restore_meaningful != 0) && snapshot != 0)
         model.params = move(best_params);
 
     return model;
