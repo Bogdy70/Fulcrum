@@ -1292,6 +1292,19 @@ Parameters train(const Tensor& X_train,
     return params;
 }
 
+Parameters clone_params(const Parameters& params)
+{
+    Parameters newparams(params.W.size());
+
+    for (int i = 1; i < params.W.size(); i++)
+    {
+        newparams.W[i] = params.W[i].clone();
+        newparams.B[i] = params.B[i].clone();
+    }
+
+    return newparams;
+}
+
 CNN_model& train_cnn(CNN_model& model,
     const Tensor& Xtrain,
     const Tensor& Xtest,
@@ -1303,15 +1316,56 @@ CNN_model& train_cnn(CNN_model& model,
     float dropout = 0.0f,
     float lambda_l1 = 0.0f,
     float lambda_l2 = 0.0f,
+    bool restore_best = false,
+    bool restore_meaningful = false,
+    float min_delta = 0.01f,
     bool early_stopping = false,
+    int patience = 3,
+    int min_epochs = 10,
     float beta1 = 0.9f,
     float beta2 = 0.999f,
     float eps = 1e-8f)
 {
     auto start_time = chrono::high_resolution_clock::now();
 
+    if (restore_best != 0 && restore_meaningful != 0)
+        throw runtime_error("Only one restore option can be selected!");
+
+    float reference_cost = 100.0f;
+    float reference_cost_best = 100.0f;
+    Parameters best_params(model.params.W.size());
+    int counter = 0;
+
     for (int epoch = 0; epoch <= epochs; epoch++)
     {
+        if ((restore_best != 0 || early_stopping != 0) && epoch >= min_epochs)
+        {
+            Forward test_frd_cache = conv_frdpass(model.params, Xtest, model.cv_stats, model.mx_stats, model.activ);
+            float test_cost = cost(ytest, test_frd_cache.A[size(model.params.W) - 1], model.params);
+
+            if (restore_best!=0 && test_cost <= reference_cost_best)
+            {
+                reference_cost_best = test_cost;
+                best_params = clone_params(model.params);
+            }
+            if (early_stopping != 0)
+            {
+                if (test_cost <= reference_cost - min_delta)
+                {
+                    counter = 0;
+                    reference_cost = test_cost;
+                    if (restore_meaningful != 0)
+                        best_params = clone_params(model.params);
+                }
+                else
+                {
+                    counter++;
+                    if (counter >= patience)
+                        break;
+                }
+            }
+        }
+
         if (epoch % viewing_rate == 0 || epoch == epochs)
         {
             cudaDeviceSynchronize();
@@ -1340,6 +1394,9 @@ CNN_model& train_cnn(CNN_model& model,
         adam(model.params, cnn_grads, model.state, lr, beta1, beta2, eps);
     }
 
+    if ((restore_best != 0 && reference_cost_best < 100) || (restore_meaningful != 0 && reference_cost < 100))
+        model.params = move(best_params);
+
     return model;
 }
 
@@ -1350,19 +1407,6 @@ CNN_model& change_params(CNN_model& model)
     model.params.W[1] = Replace.clone();
 
     return model;
-}
-
-Parameters clone_params(const Parameters& params)
-{
-    Parameters newparams(params.W.size());
-
-    for (int i = 1; i < params.W.size(); i++)
-    {
-        newparams.W[i] = params.W[i].clone();
-        newparams.B[i] = params.B[i].clone();
-    }
-
-    return newparams;
 }
 
 CNN_model& change_params2(CNN_model& model)
