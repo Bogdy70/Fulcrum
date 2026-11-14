@@ -6,3 +6,4 @@
 #include <fulcrum/io/IO.h>
 #include <fulcrum/nn/NN.h>
 #include <fulcrum/optim/Optim.h>
+#include <fulcrum/data/Data.h>

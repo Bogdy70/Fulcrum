@@ -25,4 +25,9 @@ namespace fulcrum::io
 	void save_cnn(const CNN_model& model, const filesystem::path& path, bool save_adam = false);
 
 	CNN_model load_cnn(const filesystem::path& path, bool restore_adam = false);
+
+	void save_cnn_image(
+		const CPUTensor& X,
+		int imgIdx,
+		const std::filesystem::path& path);
 }

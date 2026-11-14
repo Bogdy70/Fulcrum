@@ -624,4 +624,72 @@ namespace fulcrum::io
 
         return load_model;
     }
+
+    void save_cnn_image(
+        const CPUTensor& X,
+        int imgIdx,
+        const std::filesystem::path& path)
+    {
+        const auto shape = X.getShape();
+
+        if (X.getDataType() != DataType::float32 ||
+            shape.size() != 4 || shape[1] != 3)
+        {
+            throw std::runtime_error(
+                "Expected float32 images shaped (batch, 3, H, W).");
+        }
+
+        if (imgIdx < 0 || imgIdx >= shape[0])
+            throw std::runtime_error("Image index out of range.");
+
+        const int H = shape[2];
+        const int W = shape[3];
+
+        if (H <= 0 || W <= 0)
+            throw std::runtime_error("Invalid image dimensions.");
+
+        const std::size_t plane = static_cast<std::size_t>(H) * W;
+        const std::size_t base = static_cast<std::size_t>(imgIdx) * 3 * plane;
+
+        const float* data = X.getFloatData();
+
+        std::ofstream out(path, std::ios::binary);
+
+        if (!out)
+            throw std::runtime_error("Cannot open image file.");
+
+        out << "P6\n" << W << ' ' << H << "\n255\n";
+
+        for (int y = 0; y < H; ++y)
+        {
+            for (int x = 0; x < W; ++x)
+            {
+                for (int c = 0; c < 3; ++c)
+                {
+                    const std::size_t index =
+                        base + c * plane +
+                        static_cast<std::size_t>(y) * W + x;
+
+                    const float value = data[index];
+
+                    if (!std::isfinite(value))
+                        throw std::runtime_error(
+                            "Image contains a non-finite value.");
+
+                    const auto pixel = static_cast<unsigned char>(
+                        std::lround(
+                            std::clamp(value, 0.0f, 1.0f) * 255.0f));
+
+                    out.write(
+                        reinterpret_cast<const char*>(&pixel),
+                        sizeof(pixel));
+                }
+            }
+        }
+
+        out.close();
+
+        if (!out)
+            throw std::runtime_error("Failed to write image file.");
+    }
 }
