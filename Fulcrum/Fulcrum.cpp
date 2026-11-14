@@ -9,10 +9,13 @@
 #include <cstring>
 #include <cstdint>
 #include <algorithm>
-#include <fulcrum/Tensor.cuh>
-#include <fulcrum/CPUTensor.h>
+#include <Fulcrum.h>
 
 using namespace std;
+using fulcrum::Tensor;
+using fulcrum::MaxPoolRes;
+using fulcrum::CPUTensor;
+using fulcrum::DataType;
 
 void save_vector_bin(const vector<float>& x, const filesystem::path& path)
 {

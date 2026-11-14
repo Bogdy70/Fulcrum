@@ -161,6 +161,7 @@
     <Text Include="data\mnist\shapes.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Fulcrum.h" />
     <ClInclude Include="fulcrum\CPUTensor.h" />
     <ClInclude Include="fulcrum\data\Data.h" />
     <ClInclude Include="fulcrum\io\IO.h" />

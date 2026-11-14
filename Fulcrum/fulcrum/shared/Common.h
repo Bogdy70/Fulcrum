@@ -1,10 +1,13 @@
 #pragma once
 
-enum class DataType
+namespace fulcrum
 {
-	float32,
-	int32
-};
+	enum class DataType
+	{
+		float32,
+		int32
+	};
 
-class Tensor;
-class CPUTensor;
+	class Tensor;
+	class CPUTensor;
+}

@@ -42,6 +42,9 @@
     <ClInclude Include="fulcrum\data\Data.h">
       <Filter>fulcrum\data</Filter>
     </ClInclude>
+    <ClInclude Include="Fulcrum.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="data\cat\cat_shapes.txt">

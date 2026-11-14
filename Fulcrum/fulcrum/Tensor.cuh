@@ -7,176 +7,179 @@
 
 using namespace std;
 
-class CPUTensor;
-
-struct MaxPoolRes;
-
-struct MaxStats
+namespace fulcrum
 {
-	float value;
-	int index;
-};
+	class CPUTensor;
 
-constexpr int MAX_TENSOR_LENGTH = 8;
+	struct MaxPoolRes;
 
-struct BroadcastStats
-{
-	int out_shape[MAX_TENSOR_LENGTH]{};
-	int out_stride[MAX_TENSOR_LENGTH]{};
-	int strideA[MAX_TENSOR_LENGTH]{};
-	int strideB[MAX_TENSOR_LENGTH]{};
-};
+	struct MaxStats
+	{
+		float value;
+		int index;
+	};
 
+	constexpr int MAX_TENSOR_LENGTH = 8;
 
-class Tensor
-{
-private:
-	void* data = nullptr;
-	vector<int> shape;
-	vector<int> stride;
-	int total = 0;
-	DataType dtype = DataType::float32;
+	struct BroadcastStats
+	{
+		int out_shape[MAX_TENSOR_LENGTH]{};
+		int out_stride[MAX_TENSOR_LENGTH]{};
+		int strideA[MAX_TENSOR_LENGTH]{};
+		int strideB[MAX_TENSOR_LENGTH]{};
+	};
 
-	static int calculateTotal(const vector<int>& shape);
-	static vector<int> calculateStride(const vector<int>& shape);
-	static size_t calcDataSize(DataType dtype);
 
-public:
-	size_t byteSize() const;
+	class Tensor
+	{
+	private:
+		void* data = nullptr;
+		vector<int> shape;
+		vector<int> stride;
+		int total = 0;
+		DataType dtype = DataType::float32;
 
-	Tensor();
+		static int calculateTotal(const vector<int>& shape);
+		static vector<int> calculateStride(const vector<int>& shape);
+		static size_t calcDataSize(DataType dtype);
 
-	Tensor(const vector<int>& shape, DataType dtype = DataType::float32);
+	public:
+		size_t byteSize() const;
 
-	~Tensor();
-	
-	Tensor(const Tensor&) = delete;
-	Tensor& operator=(const Tensor&) = delete;
+		Tensor();
 
-	Tensor(Tensor&& other) noexcept;
-	Tensor& operator=(Tensor&& other) noexcept;
+		Tensor(const vector<int>& shape, DataType dtype = DataType::float32);
 
-	float* getFloatData();
+		~Tensor();
 
-	const float* getFloatData() const;
+		Tensor(const Tensor&) = delete;
+		Tensor& operator=(const Tensor&) = delete;
 
-	int32_t* getIntData();
+		Tensor(Tensor&& other) noexcept;
+		Tensor& operator=(Tensor&& other) noexcept;
 
-	const int32_t* getIntData() const;
+		float* getFloatData();
 
-	Tensor& operator=(const std::vector<float>& X);
+		const float* getFloatData() const;
 
-	Tensor& operator=(const std::vector<int32_t>& X);
+		int32_t* getIntData();
 
-	int size() const;
+		const int32_t* getIntData() const;
 
-	int dim() const;
+		Tensor& operator=(const std::vector<float>& X);
 
-	const vector<int>& getShape() const;
+		Tensor& operator=(const std::vector<int32_t>& X);
 
-	const vector<int>& getStride() const;
+		int size() const;
 
-	DataType getDataType() const;
+		int dim() const;
 
-	CPUTensor toCPU() const;
+		const vector<int>& getShape() const;
 
-	static Tensor zeros(const vector<int>& shape, DataType dtype = DataType::float32);
+		const vector<int>& getStride() const;
 
-	static Tensor fill(const vector<int>& shape, float value, DataType dtype = DataType::float32);
+		DataType getDataType() const;
 
-	static Tensor random(const vector<int>& shape);
+		CPUTensor toCPU() const;
 
-	static Tensor randomUniform(const vector<int>& shape, float start, float end);
+		static Tensor zeros(const vector<int>& shape, DataType dtype = DataType::float32);
 
-	Tensor& reshape(const vector<int>& shape);
+		static Tensor fill(const vector<int>& shape, float value, DataType dtype = DataType::float32);
 
-	Tensor& resize(const vector<int>& shape);
+		static Tensor random(const vector<int>& shape);
 
-	Tensor& squeeze(int dim = -1);
+		static Tensor randomUniform(const vector<int>& shape, float start, float end);
 
-	Tensor& unsqueeze(int dim = 0);
+		Tensor& reshape(const vector<int>& shape);
 
-	Tensor& flatten(int start_dim = 0, int end_dim = -1);
+		Tensor& resize(const vector<int>& shape);
 
-	static Tensor pad(const Tensor& A, int padding, float val = 0.0f);
+		Tensor& squeeze(int dim = -1);
 
-	static Tensor conv2D(const Tensor& A, const Tensor& K, int kernel_size = 3, int hStride = 1, int vStride = 1, int padding = 0);
+		Tensor& unsqueeze(int dim = 0);
 
-	static Tensor conv2D_dK(const Tensor& A, const Tensor& dZ, int frd_kdim = 3, int hStride = 1, int vStride = 1, int frd_padding = 0);
+		Tensor& flatten(int start_dim = 0, int end_dim = -1);
 
-	static Tensor conv2D_dX(const Tensor& dZ, const Tensor& K, int frdN, int frdM, int hStride = 1, int vStride = 1, int frd_padding = 0);
+		static Tensor pad(const Tensor& A, int padding, float val = 0.0f);
 
-	static MaxPoolRes maxPool2D(const Tensor& A, int kernel_size = 2, int hStride = 1, int vStride = 1, int padding = 0);
+		static Tensor conv2D(const Tensor& A, const Tensor& K, int kernel_size = 3, int hStride = 1, int vStride = 1, int padding = 0);
 
-	static Tensor back_maxPool2D(const Tensor& dP_vals, const Tensor& dP_idxs, int frdN, int frdM, int frd_padding = 0);
+		static Tensor conv2D_dK(const Tensor& A, const Tensor& dZ, int frd_kdim = 3, int hStride = 1, int vStride = 1, int frd_padding = 0);
 
-	Tensor operator*(const Tensor& B) const;
+		static Tensor conv2D_dX(const Tensor& dZ, const Tensor& K, int frdN, int frdM, int hStride = 1, int vStride = 1, int frd_padding = 0);
 
-	Tensor operator/(const Tensor& B) const;
+		static MaxPoolRes maxPool2D(const Tensor& A, int kernel_size = 2, int hStride = 1, int vStride = 1, int padding = 0);
 
-	Tensor operator+(const Tensor& B) const;
+		static Tensor back_maxPool2D(const Tensor& dP_vals, const Tensor& dP_idxs, int frdN, int frdM, int frd_padding = 0);
 
-	Tensor operator-(const Tensor& B) const;
+		Tensor operator*(const Tensor& B) const;
 
-	Tensor operator*(float x) const;
+		Tensor operator/(const Tensor& B) const;
 
-	Tensor operator/(float x) const;
+		Tensor operator+(const Tensor& B) const;
 
-	Tensor operator+(float x) const;
+		Tensor operator-(const Tensor& B) const;
 
-	Tensor operator-(float x) const;
+		Tensor operator*(float x) const;
 
-	Tensor operator==(const Tensor& B) const;
+		Tensor operator/(float x) const;
 
-	Tensor operator>(float x) const;
+		Tensor operator+(float x) const;
 
-	Tensor operator<(float x) const;
+		Tensor operator-(float x) const;
 
-	Tensor matmul(const Tensor& B) const;
+		Tensor operator==(const Tensor& B) const;
 
-	Tensor T() const;
+		Tensor operator>(float x) const;
 
-	static Tensor sum(const Tensor& A, int axis = -1, bool keepdim = false);
+		Tensor operator<(float x) const;
 
-	static Tensor maxT(const Tensor& A, int axis = -1, bool keepdim = false);
+		Tensor matmul(const Tensor& B) const;
 
-	static Tensor argmax(const Tensor& A, int axis = -1, bool keepdim = false);
+		Tensor T() const;
 
-	static Tensor powT(const Tensor& A, float power);
+		static Tensor sum(const Tensor& A, int axis = -1, bool keepdim = false);
 
-	static Tensor sqrtT(const Tensor& A);
+		static Tensor maxT(const Tensor& A, int axis = -1, bool keepdim = false);
 
-	static Tensor expT(const Tensor& A);
+		static Tensor argmax(const Tensor& A, int axis = -1, bool keepdim = false);
 
-	static Tensor logT(const Tensor& A);
+		static Tensor powT(const Tensor& A, float power);
 
-	static Tensor absT(const Tensor& A);
+		static Tensor sqrtT(const Tensor& A);
 
-	static Tensor clipT(const Tensor& A, float minVal, float maxVal);
+		static Tensor expT(const Tensor& A);
 
-	static Tensor tanhT(const Tensor& A);
+		static Tensor logT(const Tensor& A);
 
-	static Tensor relu(const Tensor& A);
+		static Tensor absT(const Tensor& A);
 
-	static Tensor der_relu(const Tensor& A);
+		static Tensor clipT(const Tensor& A, float minVal, float maxVal);
 
-	Tensor clone() const;
+		static Tensor tanhT(const Tensor& A);
 
-	float toScalar() const;
-};
+		static Tensor relu(const Tensor& A);
 
-Tensor operator*(float x, const Tensor& A);
+		static Tensor der_relu(const Tensor& A);
 
-Tensor operator+(float x, const Tensor& A);
+		Tensor clone() const;
 
-Tensor operator/(float x, const Tensor& A);
+		float toScalar() const;
+	};
 
-Tensor operator-(float x, const Tensor& A);
+	Tensor operator*(float x, const Tensor& A);
 
-struct MaxPoolRes
-{
-	Tensor vals;
-	Tensor idxs;
+	Tensor operator+(float x, const Tensor& A);
 
-	MaxPoolRes(vector<int>& shape) : vals(shape), idxs(shape, DataType::int32) {}
-};
+	Tensor operator/(float x, const Tensor& A);
+
+	Tensor operator-(float x, const Tensor& A);
+
+	struct MaxPoolRes
+	{
+		Tensor vals;
+		Tensor idxs;
+
+		MaxPoolRes(vector<int>& shape) : vals(shape), idxs(shape, DataType::int32) {}
+	};
+}
