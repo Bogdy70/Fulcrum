@@ -3286,4 +3286,27 @@ namespace fulcrum
 
 		return res;
 	}
+
+	Tensor Tensor::sigmoid(const Tensor& A)
+	{
+		return 1.0f / (1.0f + Tensor::expT(-1.0f * A));
+	}
+
+	Tensor Tensor::softmax(const Tensor& A)
+	{
+		Tensor exp_A = Tensor::expT(A);
+		Tensor sum_exp = Tensor::sum(exp_A, 0);
+
+		return exp_A / sum_exp;
+	}
+
+	Tensor Tensor::der_tanh(const Tensor& A)
+	{
+		return 1.0f - (Tensor::tanhT(A) * Tensor::tanhT(A));
+	}
+
+	Tensor Tensor::sign(const Tensor& A)
+	{
+		return (A > 0.0f) - (A < 0.0f);
+	}
 }

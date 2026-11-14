@@ -165,6 +165,14 @@ namespace fulcrum
 		Tensor clone() const;
 
 		float toScalar() const;
+
+		static Tensor sigmoid(const Tensor& A);
+
+		static Tensor softmax(const Tensor& A);
+
+		static Tensor der_tanh(const Tensor& A);
+
+		static Tensor sign(const Tensor& A);
 	};
 
 	Tensor operator*(float x, const Tensor& A);
