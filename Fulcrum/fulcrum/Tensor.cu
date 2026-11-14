@@ -1,5 +1,5 @@
-#include "Tensor.cuh"
-#include "CPUTensor.h"
+#include <fulcrum/Tensor.cuh>
+#include <fulcrum/CPUTensor.h>
 #include <stdexcept>
 
 Tensor::Tensor(): data(nullptr), shape(), stride(), total(0), dtype(DataType::float32) {}

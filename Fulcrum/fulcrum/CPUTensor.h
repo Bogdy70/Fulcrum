@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include "Common.h"
+#include <fulcrum/shared/Common.h>
 #include <string>
 
 using namespace std;

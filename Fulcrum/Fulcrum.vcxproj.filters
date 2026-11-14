@@ -4,19 +4,43 @@
     <ClCompile Include="Fulcrum.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CPUTensor.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="fulcrum\CPUTensor.cpp">
+      <Filter>fulcrum</Filter>
+    </ClCompile>
+    <ClCompile Include="fulcrum\nn\NN.cpp">
+      <Filter>fulcrum\nn</Filter>
+    </ClCompile>
+    <ClCompile Include="fulcrum\io\IO.cpp">
+      <Filter>fulcrum\io</Filter>
+    </ClCompile>
+    <ClCompile Include="fulcrum\optim\Optim.cpp">
+      <Filter>fulcrum\optim</Filter>
+    </ClCompile>
+    <ClCompile Include="fulcrum\data\Data.cpp">
+      <Filter>fulcrum\data</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Tensor.cuh">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="fulcrum\CPUTensor.h">
+      <Filter>fulcrum</Filter>
     </ClInclude>
-    <ClInclude Include="CPUTensor.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="fulcrum\Tensor.cuh">
+      <Filter>fulcrum</Filter>
     </ClInclude>
-    <ClInclude Include="Common.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="fulcrum\shared\Common.h">
+      <Filter>fulcrum\shared</Filter>
+    </ClInclude>
+    <ClInclude Include="fulcrum\nn\NN.h">
+      <Filter>fulcrum\nn</Filter>
+    </ClInclude>
+    <ClInclude Include="fulcrum\io\IO.h">
+      <Filter>fulcrum\io</Filter>
+    </ClInclude>
+    <ClInclude Include="fulcrum\optim\Optim.h">
+      <Filter>fulcrum\optim</Filter>
+    </ClInclude>
+    <ClInclude Include="fulcrum\data\Data.h">
+      <Filter>fulcrum\data</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -48,6 +72,24 @@
     </Filter>
     <Filter Include="data\meteors">
       <UniqueIdentifier>{c15b868e-3172-4ac4-8e25-b7483270d017}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="fulcrum">
+      <UniqueIdentifier>{6fac7b1c-1c31-4caf-bc6b-1c02fb8e6fd7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="fulcrum\nn">
+      <UniqueIdentifier>{078cffef-642e-47f5-a5c8-4059345b51d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="fulcrum\shared">
+      <UniqueIdentifier>{651b431d-787a-47a9-b8c5-620579c05839}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="fulcrum\io">
+      <UniqueIdentifier>{23a360b9-6a56-45f9-a18a-cc2f71179150}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="fulcrum\optim">
+      <UniqueIdentifier>{632a6421-eb4a-4012-8238-6127171ee579}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="fulcrum\data">
+      <UniqueIdentifier>{8671f291-cba7-4efa-bfe6-80d5341874c6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -107,8 +149,8 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="Tensor.cu">
-      <Filter>Source Files</Filter>
+    <CudaCompile Include="fulcrum\Tensor.cu">
+      <Filter>fulcrum</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>

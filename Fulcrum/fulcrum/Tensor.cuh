@@ -2,7 +2,7 @@
 
 #include <cuda_runtime.h>
 #include <vector>
-#include "Common.h"
+#include <fulcrum/shared/Common.h>
 #include <variant>
 
 using namespace std;

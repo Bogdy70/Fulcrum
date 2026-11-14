@@ -135,6 +135,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -148,20 +149,25 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CPUTensor.cpp" />
     <ClCompile Include="Fulcrum.cpp" />
+    <ClCompile Include="fulcrum\CPUTensor.cpp" />
+    <ClCompile Include="fulcrum\data\Data.cpp" />
+    <ClCompile Include="fulcrum\io\IO.cpp" />
+    <ClCompile Include="fulcrum\nn\NN.cpp" />
+    <ClCompile Include="fulcrum\optim\Optim.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="data\cat\cat_shapes.txt" />
     <Text Include="data\mnist\shapes.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Common.h" />
-    <ClInclude Include="CPUTensor.h" />
-    <ClInclude Include="Tensor.cuh" />
-  </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="Tensor.cu" />
+    <ClInclude Include="fulcrum\CPUTensor.h" />
+    <ClInclude Include="fulcrum\data\Data.h" />
+    <ClInclude Include="fulcrum\io\IO.h" />
+    <ClInclude Include="fulcrum\nn\NN.h" />
+    <ClInclude Include="fulcrum\optim\Optim.h" />
+    <ClInclude Include="fulcrum\shared\Common.h" />
+    <ClInclude Include="fulcrum\Tensor.cuh" />
   </ItemGroup>
   <ItemGroup>
     <None Include="data\cat\X_test.bin" />
@@ -182,6 +188,9 @@
     <None Include="data\mnist\X_train.bin" />
     <None Include="data\mnist\Y_test.bin" />
     <None Include="data\mnist\Y_train.bin" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="fulcrum\Tensor.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -9,8 +9,8 @@
 #include <cstring>
 #include <cstdint>
 #include <algorithm>
-#include "Tensor.cuh"
-#include "CPUTensor.h"
+#include <fulcrum/Tensor.cuh>
+#include <fulcrum/CPUTensor.h>
 
 using namespace std;
 

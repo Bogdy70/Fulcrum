@@ -1,4 +1,4 @@
-#include "CPUTensor.h";
+#include <fulcrum/CPUTensor.h>
 #include "Tensor.cuh"
 #include <stdexcept>
 #include <iostream>
