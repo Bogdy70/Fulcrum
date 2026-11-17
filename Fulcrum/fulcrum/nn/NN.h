@@ -157,4 +157,6 @@ namespace fulcrum::nn
     void predict(const CPUTensor& X_test, const CPUTensor& y_test, const Parameters& params, const string& activation, int imgIdx);
 
     void predict_cnn(const CNN_model& model, const Tensor& X, const Tensor& y, int idx);
+
+    void predict_cnn_custom(const CNN_model& model, const Tensor& X, int idx, bool type = 0);
 }

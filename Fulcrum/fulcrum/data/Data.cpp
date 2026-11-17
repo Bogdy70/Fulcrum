@@ -112,4 +112,83 @@ namespace fulcrum::data
 
         return loaded_img;
     }
+
+    CPUTensor loadMatrixBin(const string& filepath, int rows, int cols)
+    {
+        CPUTensor mat({ rows, cols });
+
+        ifstream file(filepath, ios::binary);
+
+        if (!file)
+        {
+            throw runtime_error("File " + filepath + " could not be opened");
+        }
+
+        file.read(
+            reinterpret_cast<char*>(mat.getFloatData()),
+            rows * cols * sizeof(float)
+        );
+
+        if (!file)
+        {
+            throw runtime_error("Error while reading file" + filepath);
+        }
+
+        return mat;
+    }
+
+    CPUTensor loadTensorBin(
+        const std::string& filepath,
+        const std::vector<int>& shape)
+    {
+        static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559,
+            "The exporter requires IEEE-754 float32.");
+
+        // The exported format is little-endian, as on your Windows x86-64 machine.
+        const std::uint32_t one = 1;
+        if (*reinterpret_cast<const unsigned char*>(&one) != 1)
+            throw std::runtime_error("This loader requires a little-endian host.");
+
+        if (shape.empty())
+            throw std::runtime_error("Dataset shape cannot be empty!");
+
+        // Your Tensor implementation uses int counts/indices.
+        size_t count = 1;
+        for (int dimension : shape)
+        {
+            if (dimension <= 0)
+                throw std::runtime_error("Dataset dimensions must be positive!");
+
+            if (count > static_cast<size_t>(std::numeric_limits<int>::max()) /
+                static_cast<size_t>(dimension))
+                throw std::runtime_error("Dataset exceeds int indexing capacity!");
+
+            count *= static_cast<size_t>(dimension);
+        }
+
+        if (count > static_cast<size_t>(std::numeric_limits<std::streamsize>::max()) /
+            sizeof(float))
+            throw std::runtime_error("Dataset exceeds stream read capacity!");
+
+        const std::streamsize bytes =
+            static_cast<std::streamsize>(count * sizeof(float));
+
+        std::ifstream file(filepath, std::ios::binary | std::ios::ate);
+        if (!file)
+            throw std::runtime_error("Could not open file: " + filepath);
+
+        if (file.tellg() != std::streampos(bytes))
+            throw std::runtime_error(
+                "File size does not match the requested shape: " + filepath);
+
+        file.seekg(0, std::ios::beg);
+
+        // CPUTensor's default dtype is float32.
+        CPUTensor mat(shape);
+        file.read(reinterpret_cast<char*>(mat.getFloatData()), bytes);
+        if (!file)
+            throw std::runtime_error("Error reading file: " + filepath);
+
+        return mat;
+    }
 }

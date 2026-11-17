@@ -561,4 +561,30 @@ namespace fulcrum::nn
             cout << "\nTruth: " << label << " ||| Pred: " << prediction;
         }
     }
+
+    void predict_cnn_custom(const CNN_model& model, const Tensor& X, int idx, bool type)
+    {
+        CPUTensor one_img = choose_img(X.toCPU(), idx);
+
+        Forward frd_cache = conv_frdpass(model.params, one_img.toCUDA(), model.cv_stats, model.mx_stats, model.activ);
+
+        int L = static_cast<int>(model.params.W.size());
+
+        float prediction = 0.0f;
+
+        if (type == 0)
+        {
+            prediction = (frd_cache.A[L - 1] > 0.5f).toScalar();
+
+            string prd = prediction == 0.0f ? "no-meteor" : "meteor";
+
+            cout << "\nPred: " << prd;
+        }
+        else
+        {
+            prediction = Tensor::argmax(frd_cache.A[L - 1], 0).toScalar();
+
+            cout << "\nPred: " << prediction;
+        }
+    }
 }

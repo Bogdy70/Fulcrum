@@ -363,32 +363,32 @@ int main()
 {
     try
     {
-        CPUTensor X_train_cat = CPUTensor::loadMatrixBin("data/cat/X_train.bin", 12288, 209);
-        CPUTensor y_train_cat = CPUTensor::loadMatrixBin("data/cat/Y_train.bin", 1, 209);
+        CPUTensor X_train_cat = loadMatrixBin("data/cat/X_train.bin", 12288, 209);
+        CPUTensor y_train_cat = loadMatrixBin("data/cat/Y_train.bin", 1, 209);
 
-        CPUTensor X_test_cat = CPUTensor::loadMatrixBin("data/cat/X_test.bin", 12288, 50);
-        CPUTensor y_test_cat = CPUTensor::loadMatrixBin("data/cat/Y_test.bin", 1, 50);
+        CPUTensor X_test_cat = loadMatrixBin("data/cat/X_test.bin", 12288, 50);
+        CPUTensor y_test_cat = loadMatrixBin("data/cat/Y_test.bin", 1, 50);
 
-        CPUTensor X_train_mnist = CPUTensor::loadMatrixBin("data/mnist/X_train.bin", 784, 5000);
-        CPUTensor y_train_mnist = CPUTensor::loadMatrixBin("data/mnist/Y_train.bin", 10, 5000);
+        CPUTensor X_train_mnist = loadMatrixBin("data/mnist/X_train.bin", 784, 5000);
+        CPUTensor y_train_mnist = loadMatrixBin("data/mnist/Y_train.bin", 10, 5000);
 
-        CPUTensor X_test_mnist = CPUTensor::loadMatrixBin("data/mnist/X_test.bin", 784, 1000);
-        CPUTensor y_test_mnist = CPUTensor::loadMatrixBin("data/mnist/Y_test.bin", 10, 1000);
+        CPUTensor X_test_mnist = loadMatrixBin("data/mnist/X_test.bin", 784, 1000);
+        CPUTensor y_test_mnist = loadMatrixBin("data/mnist/Y_test.bin", 10, 1000);
 
-        CPUTensor X_train_cnn = CPUTensor::loadTensorBin("data/cifar10_cnn/X_train.bin", { 1000, 3, 32, 32 });
-        CPUTensor y_train_cnn = CPUTensor::loadTensorBin("data/cifar10_cnn/Y_train.bin", { 10, 1000 });
+        CPUTensor X_train_cnn = loadTensorBin("data/cifar10_cnn/X_train.bin", { 1000, 3, 32, 32 });
+        CPUTensor y_train_cnn = loadTensorBin("data/cifar10_cnn/Y_train.bin", { 10, 1000 });
 
-        CPUTensor X_test_cnn = CPUTensor::loadTensorBin("data/cifar10_cnn/X_test.bin", { 100, 3, 32, 32 });
-        CPUTensor y_test_cnn = CPUTensor::loadTensorBin("data/cifar10_cnn/Y_test.bin", { 10, 100 });
+        CPUTensor X_test_cnn = loadTensorBin("data/cifar10_cnn/X_test.bin", { 100, 3, 32, 32 });
+        CPUTensor y_test_cnn = loadTensorBin("data/cifar10_cnn/Y_test.bin", { 10, 100 });
 
-        CPUTensor X_train_meteors = CPUTensor::loadTensorBin("data/meteor_cnn/X_train.bin", { 1000, 3, 128, 128 });
-        CPUTensor y_train_meteors = CPUTensor::loadTensorBin("data/meteor_cnn/Y_train.bin", { 1, 1000 });
+        CPUTensor X_train_meteors = loadTensorBin("data/meteor_cnn/X_train.bin", { 1000, 3, 128, 128 });
+        CPUTensor y_train_meteors = loadTensorBin("data/meteor_cnn/Y_train.bin", { 1, 1000 });
 
-        CPUTensor X_val_meteors = CPUTensor::loadTensorBin("data/meteor_cnn/X_val.bin", { 100, 3, 128, 128 });
-        CPUTensor y_val_meteors = CPUTensor::loadTensorBin("data/meteor_cnn/Y_val.bin", { 1, 100 });
+        CPUTensor X_val_meteors = loadTensorBin("data/meteor_cnn/X_val.bin", { 100, 3, 128, 128 });
+        CPUTensor y_val_meteors = loadTensorBin("data/meteor_cnn/Y_val.bin", { 1, 100 });
 
-        CPUTensor X_test_meteors = CPUTensor::loadTensorBin("data/meteor_cnn/X_test.bin", { 100, 3, 128, 128 });
-        CPUTensor y_test_meteors = CPUTensor::loadTensorBin("data/meteor_cnn/Y_test.bin", { 1, 100 });
+        CPUTensor X_test_meteors = loadTensorBin("data/meteor_cnn/X_test.bin", { 100, 3, 128, 128 });
+        CPUTensor y_test_meteors = loadTensorBin("data/meteor_cnn/Y_test.bin", { 1, 100 });
 
         cout << "Cat dataset loaded successfully\n";
 
@@ -1374,6 +1374,13 @@ int main()
 
         CPUTensor loaded = load_img(R"(C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us1.PNG)");
         save_cnn_image(loaded, 0, "C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us_resized.png");
+
+        CPUTensor loaded_label({ 1, 1 });
+        loaded_label = vector<float>{ 0 };
+
+        CNN_model jetson_model = load_cnn("C:/Users/ASUS/Downloads/Fulcrum_save_tests/jetson_model1.bin", true);
+        predict_cnn(jetson_model, loaded.toCUDA(), loaded_label.toCUDA(), 0);
+        predict_cnn_custom(jetson_model, X_test_meteors.toCUDA(), 87);
 
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
