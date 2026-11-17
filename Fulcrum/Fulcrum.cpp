@@ -10,6 +10,9 @@
 #include <cstdint>
 #include <algorithm>
 #include <Fulcrum.h>
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
 using namespace std;
 using fulcrum::Tensor;
@@ -1355,6 +1358,18 @@ int main()
 
         cout << load_model1.params.W[1].toCPU()(7) << "\n\n";
 
+        cout << "\n\nSome meteor image saves\n\n";
+
+        fulcrum::io::save_cnn_image(X_test_meteors, 15, "C:/Users/ASUS/Downloads/Fulcrum_meteor_images/image15.png");
+
+        cout << "\n\nOpenCV lib test\n\n";
+
+        cv::Mat test(1080, 1920, CV_8UC3, cv::Scalar(0, 0, 0));
+        cv::Mat resized;
+
+        cv::resize(test, resized, cv::Size(128, 72), 0, 0, cv::INTER_LANCZOS4);
+        cout << resized.cols << " x " << resized.rows;
+
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
 
@@ -1391,7 +1406,7 @@ int main()
             AdamState state_stopping(params_stopping);
             CNN_model model_stopping(params_stopping, cv_cnn, mx_cnn, "relu", state_stopping);
 
-            train_cnn(model_stopping, X_train_cnn.toCUDA(), X_test_cnn.toCUDA(), y_train_cnn.toCUDA(), y_test_cnn.toCUDA(), 0.001f, 120, 10, 0.0f, 0.0f, 0.1f, false, false, 0.001f, true, 3, 10, 1.70f, 0.01f);
+            train_cnn(model_stopping, X_train_cnn.toCUDA(), X_test_cnn.toCUDA(), y_train_cnn.toCUDA(), y_test_cnn.toCUDA(), 0.001f, 90, 10, 0.0f, 0.0f, 0.1f, true);
 
             cudaDeviceSynchronize();
 
@@ -1412,6 +1427,8 @@ int main()
             predict_cnn(model_stopping, X_test_cnn.toCUDA(), y_test_cnn.toCUDA(), 7);
 
             cout << "\n\n";
+
+            save_cnn(model_stopping, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/Jeston_test.bin", true);
         }
 
         {
@@ -1425,7 +1442,7 @@ int main()
             AdamState state_best(params_best);
             CNN_model model_best(params_best, cv_meteors, mx_meteors, "relu", state_best);
 
-            train_cnn(model_best, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 110, 10, 0.0f, 0.0f, 0.1f);
+            train_cnn(model_best, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 177, 17, 0.0f, 0.0f, 0.1f, true);
 
             cudaDeviceSynchronize();
 
@@ -1435,9 +1452,53 @@ int main()
 
             cout << "\nBest config Meteors training time: " << elapsed.count() << " seconds\n";
 
+            cout << "\nImg 7:";
+
             predict_cnn(model_best, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 7);
 
             cout << "\n\n";
+            cout << "Img 97:";
+
+            predict_cnn(model_best, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 97);
+
+            cout << "\n\n";
+            cout << "Img 11:";
+
+            predict_cnn(model_best, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 11);
+
+            cout << "\n\n";
+            cout << "Img 15:";
+
+            predict_cnn(model_best, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 15);
+
+            cout << "\n\n";
+            cout << "Img 78:";
+
+            predict_cnn(model_best, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 78);
+
+            cout << "\n\n";
+            cout << "Img 87:";
+
+            predict_cnn(model_best, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 87);
+
+            cout << "\n\n";
+            cout << "Img 77:";
+
+            predict_cnn(model_best, X_test_meteors.toCUDA(), y_test_meteors.toCUDA(), 77);
+
+            cout << "\n\n";
+
+            Forward eval_val = conv_frdpass(model_best.params, X_val_meteors.toCUDA(), model_best.cv_stats, model_best.mx_stats, model_best.activ);
+            float final_cost = cost(y_val_meteors.toCUDA(), eval_val.A[model_best.params.W.size() - 1], model_best.params);
+
+            cout << "Returned model cost: " << final_cost << "\n\n";
+
+            Forward eval = conv_frdpass(model_best.params, X_test_meteors.toCUDA(), model_best.cv_stats, model_best.mx_stats, model_best.activ);
+            float final_test_cost = cost(y_test_meteors.toCUDA(), eval.A[model_best.params.W.size() - 1], model_best.params);
+
+            cout << "Test model cost: " << final_test_cost << "\n\n";
+
+            save_cnn(model_best, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/jetson_model1.bin", true);
         }
 
         {

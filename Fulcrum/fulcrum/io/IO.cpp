@@ -350,7 +350,7 @@ namespace fulcrum::io
 
                 mout.write(reinterpret_cast<const char*>(model.state.VdW[i].getShape().data()), rankvdw * sizeof(int));
                 mout.write(reinterpret_cast<const char*>(model.state.VdB[i].getShape().data()), rankvdb * sizeof(int));
-                mout.write(reinterpret_cast<const char*>(model.state.SdB[i].getShape().data()), ranksdw * sizeof(int));
+                mout.write(reinterpret_cast<const char*>(model.state.SdW[i].getShape().data()), ranksdw * sizeof(int));
                 mout.write(reinterpret_cast<const char*>(model.state.SdB[i].getShape().data()), ranksdb * sizeof(int));
 
                 if (dtype == 0)
