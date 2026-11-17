@@ -1,8 +1,6 @@
 #include <fulcrum/data/Data.h>
 #include <iostream>
-#include <opencv2/core.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
+#include <filesystem>
 
 using namespace std;
 
@@ -77,5 +75,41 @@ namespace fulcrum::data
         }
 
         return one_img;
+    }
+
+    CPUTensor load_img(const cv::String& path)
+    {
+        std::cout << "File exists: "
+            << std::filesystem::exists(path) << '\n';
+
+        cv::Mat loaded = cv::imread(path, cv::IMREAD_COLOR);
+
+        if (loaded.empty())
+            throw runtime_error("Unable to read image at " + path);
+
+        if (loaded.rows != 1080 || loaded.cols != 1920)
+            throw runtime_error("Incorrect image resolution!");
+
+        cv::Mat resized;
+        cv::resize(loaded, resized, cv::Size(128, 72), 0.0, 0.0, cv::INTER_LANCZOS4); // cv::Size(width, height)
+
+        cv::Mat padded;
+        cv::copyMakeBorder(resized, padded, 28, 28, 0, 0, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+
+        CPUTensor loaded_img({ 1, 3, 128, 128 });
+
+        for (int i = 0; i < padded.rows; i++)
+        {
+            for (int j = 0; j < padded.cols; j++)
+            {
+                cv::Vec3b pixel = padded.at<cv::Vec3b>(i, j);
+
+                loaded_img(i * 128 + j) = pixel[2] / 255.0f;
+                loaded_img(128 * 128 + i * 128 + j) = pixel[1] / 255.0f;
+                loaded_img(2 * 128 * 128 + i * 128 + j) = pixel[0] / 255.0f;
+            }
+        }
+
+        return loaded_img;
     }
 }

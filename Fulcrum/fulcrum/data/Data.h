@@ -2,6 +2,9 @@
 
 #include <fulcrum/CPUTensor.h>
 #include <fulcrum/Tensor.cuh>
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
 namespace fulcrum::data
 {
@@ -10,4 +13,6 @@ namespace fulcrum::data
 	float choose_label(const Tensor& y, int idx);
 
 	CPUTensor choose_img(const CPUTensor& X, int idx);
+
+	CPUTensor load_img(const cv::String& path);
 }

@@ -1370,6 +1370,11 @@ int main()
         cv::resize(test, resized, cv::Size(128, 72), 0, 0, cv::INTER_LANCZOS4);
         cout << resized.cols << " x " << resized.rows;
 
+        cout << "\n\nLoad meteor image test\n\n";
+
+        CPUTensor loaded = load_img(R"(C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us1.PNG)");
+        save_cnn_image(loaded, 0, "C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us_resized.png");
+
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
 
