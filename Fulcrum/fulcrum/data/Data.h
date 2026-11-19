@@ -15,7 +15,7 @@ namespace fulcrum::data
 
 	CPUTensor choose_img(const CPUTensor& X, int idx);
 
-	CPUTensor load_img(const cv::String& path);
+	CPUTensor load_img(const cv::String& path, int size = 128);
 
 	CPUTensor loadMatrixBin(const std::string& filepath, int rows, int cols);
 

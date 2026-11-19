@@ -77,8 +77,11 @@ namespace fulcrum::data
         return one_img;
     }
 
-    CPUTensor load_img(const cv::String& path)
+    CPUTensor load_img(const cv::String& path, int size)
     {
+        if (size <= 0)
+            throw runtime_error("Size cannot be negative!");
+
         std::cout << "File exists: "
             << std::filesystem::exists(path) << '\n';
 
@@ -87,16 +90,35 @@ namespace fulcrum::data
         if (loaded.empty())
             throw runtime_error("Unable to read image at " + path);
 
-        if (loaded.rows != 1080 || loaded.cols != 1920)
-            throw runtime_error("Incorrect image resolution!");
-
-        cv::Mat resized;
-        cv::resize(loaded, resized, cv::Size(128, 72), 0.0, 0.0, cv::INTER_LANCZOS4); // cv::Size(width, height)
+        if (loaded.rows < size || loaded.cols < size)
+            throw runtime_error("Image size cannot be smaller than specified size!");
 
         cv::Mat padded;
-        cv::copyMakeBorder(resized, padded, 28, 28, 0, 0, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+        cv::Mat resized;
+        int height, width, gap;
 
-        CPUTensor loaded_img({ 1, 3, 128, 128 });
+        if (loaded.cols > loaded.rows)
+        {
+            height = lround(static_cast<double>(loaded.rows) / loaded.cols * size);
+            cv::resize(loaded, resized, cv::Size(size, height), 0.0, 0.0, cv::INTER_LANCZOS4);
+
+            gap = (size - height);
+            cv::copyMakeBorder(resized, padded, gap-(gap/2), gap/2, 0, 0, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+        }
+        else if (loaded.rows > loaded.cols)
+        {
+            width = lround(static_cast<double>(loaded.cols) / loaded.rows * size);
+            cv::resize(loaded, resized, cv::Size(width, size), 0.0, 0.0, cv::INTER_LANCZOS4);
+
+            gap = (size - width);
+            cv::copyMakeBorder(resized, padded, 0, 0, gap - (gap / 2), gap / 2, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+        }
+        else
+        {
+            cv::resize(loaded, padded, cv::Size(size, size), 0.0, 0.0, cv::INTER_LANCZOS4);
+        }
+
+        CPUTensor loaded_img({ 1, 3, size, size });
 
         for (int i = 0; i < padded.rows; i++)
         {
@@ -104,9 +126,9 @@ namespace fulcrum::data
             {
                 cv::Vec3b pixel = padded.at<cv::Vec3b>(i, j);
 
-                loaded_img(i * 128 + j) = pixel[2] / 255.0f;
-                loaded_img(128 * 128 + i * 128 + j) = pixel[1] / 255.0f;
-                loaded_img(2 * 128 * 128 + i * 128 + j) = pixel[0] / 255.0f;
+                loaded_img(i * size + j) = pixel[2] / 255.0f;
+                loaded_img(size * size + i * size + j) = pixel[1] / 255.0f;
+                loaded_img(2 * size * size + i * size + j) = pixel[0] / 255.0f;
             }
         }
 

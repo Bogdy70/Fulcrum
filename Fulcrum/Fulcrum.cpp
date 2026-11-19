@@ -1375,12 +1375,19 @@ int main()
         CPUTensor loaded = load_img(R"(C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us1.PNG)");
         save_cnn_image(loaded, 0, "C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us_resized.png");
 
+        CPUTensor loaded2 = load_img("C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us2.png");
+        save_cnn_image(loaded2, 0, "C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us2_resized.png");
+
+        CPUTensor loaded3 = load_img("C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us1.PNG", 256);
+        save_cnn_image(loaded3, 0, "C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us_resized2.png");
+
         CPUTensor loaded_label({ 1, 1 });
         loaded_label = vector<float>{ 0 };
 
         CNN_model jetson_model = load_cnn("C:/Users/ASUS/Downloads/Fulcrum_save_tests/jetson_model1.bin", true);
         predict_cnn(jetson_model, loaded.toCUDA(), loaded_label.toCUDA(), 0);
         predict_cnn_custom(jetson_model, X_test_meteors.toCUDA(), 87);
+        predict_cnn_custom(jetson_model, loaded2.toCUDA(), 0);
 
 
         cout << "\n\nCUDA Meteors dataset test\n\n";
