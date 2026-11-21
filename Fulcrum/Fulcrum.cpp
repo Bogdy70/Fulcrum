@@ -1470,7 +1470,7 @@ int main()
 
         cout << loader1.batch_size << " " << loader1.nr_labels() << " " << loader1.nr_samples() << " " << loader1.size() << "\n\n";
 
-        Tensor loader_batch_samples = loader1[3].sample;
+        Tensor loader_batch_samples = loader1[2].sample;
         Tensor loader_batch_labels = loader1[3].label;
 
         cout << "(";

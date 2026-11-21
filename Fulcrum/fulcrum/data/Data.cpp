@@ -47,7 +47,7 @@ namespace fulcrum::data
                     for (int w = 0; w < W; w++)
                     {
                         int other_idx = b * C * H * W + c * H * W + h * W + w;
-                        int save_idx = b % save_batch_size * C * H * W + c * H * W + h * W + w;
+                        int save_idx = (b - index * batch_size) * C * H * W + c * H * W + h * W + w;
 
                         sample_cpu(save_idx) = samples_cpu(other_idx);
                     }
@@ -60,7 +60,7 @@ namespace fulcrum::data
             for (int b = batch_size * index; b < (batch_size * index) + save_batch_size; b++)
             {
                 int other_idx = cl * nr_labels() + b;
-                int save_idx = cl * nr_labels() + b % save_batch_size;
+                int save_idx = cl * save_batch_size + (b - index * batch_size);
 
                 label_cpu(save_idx) = labels_cpu(other_idx);
             }
