@@ -9,6 +9,57 @@
 
 namespace fulcrum::data
 {
+	struct DataLoader
+	{
+		Tensor samples;
+		Tensor labels;
+		int batch_size;
+
+		DataLoader(const Tensor& X, const Tensor& y, int batch_size = 32)
+		{
+			if (X.dim() != 4)
+				throw runtime_error("Samples dataset must be 4 dimensional!");
+
+			if (y.dim() != 2)
+				throw runtime_error("Labels dataset must be 2 dimensional!");
+
+			this->samples = X.clone();
+			this->labels = y.clone();
+			this->batch_size = batch_size;
+		}
+
+		int size() const;
+
+		int nr_samples() const;
+
+		int nr_labels() const;
+
+		struct Batch
+		{
+			Tensor sample;
+			Tensor label;
+		};
+
+		Batch operator[](int index);
+
+		const Batch operator[](int index) const;
+
+		struct Iterator
+		{
+			int position;
+
+			int operator*() const
+			{
+				return position;
+			}
+
+			void operator++()
+			{
+				++position;
+			}
+		};
+	};
+
 	void printMnistImage(const CPUTensor& img, int sample_idx);
 
 	float choose_label(const Tensor& y, int idx);

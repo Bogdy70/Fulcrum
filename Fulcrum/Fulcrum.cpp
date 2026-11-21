@@ -390,6 +390,15 @@ int main()
         CPUTensor X_test_meteors = loadTensorBin("data/meteor_cnn/X_test.bin", { 100, 3, 128, 128 });
         CPUTensor y_test_meteors = loadTensorBin("data/meteor_cnn/Y_test.bin", { 1, 100 });
 
+        CPUTensor X_train_cd = loadTensorBin("C:/Users/ASUS/Downloads/Fulcrum-Cats-vs-Dogs/cats_dogs_cnn/X_train.bin", { 1000, 3, 128, 128 });
+        CPUTensor y_train_cd = loadTensorBin("C:/Users/ASUS/Downloads/Fulcrum-Cats-vs-Dogs/cats_dogs_cnn/Y_train.bin", { 1, 1000 });
+
+        CPUTensor X_val_cd = loadTensorBin("C:/Users/ASUS/Downloads/Fulcrum-Cats-vs-Dogs/cats_dogs_cnn/X_val.bin", { 100, 3, 128, 128 });
+        CPUTensor y_val_cd = loadTensorBin("C:/Users/ASUS/Downloads/Fulcrum-Cats-vs-Dogs/cats_dogs_cnn/Y_val.bin", { 1, 100 });
+
+        CPUTensor X_test_cd = loadTensorBin("C:/Users/ASUS/Downloads/Fulcrum-Cats-vs-Dogs/cats_dogs_cnn/X_test.bin", { 100, 3, 128, 128 });
+        CPUTensor y_test_cd = loadTensorBin("C:/Users/ASUS/Downloads/Fulcrum-Cats-vs-Dogs/cats_dogs_cnn/Y_test.bin", { 1, 100 });
+
         cout << "Cat dataset loaded successfully\n";
 
         cout << "X_train_cat: (" << X_train_cat.getShape()[X_train_cat.dim() - 2] << ", " << X_train_cat.getShape()[X_train_cat.dim() - 1] << ")\n";
@@ -496,6 +505,62 @@ int main()
         {
             cout << y_test_meteors.getShape()[i];
             if (i != y_test_meteors.dim() - 1)
+                cout << ", ";
+        }
+        cout << ")";
+
+        cout << "\n\nCats and Dogs dataset loaded successfully!";
+
+        cout << "\nX_train_cd: (";
+        for (int i = 0; i < X_train_cd.dim(); i++)
+        {
+            cout << X_train_cd.getShape()[i];
+            if (i != X_train_cd.dim() - 1)
+                cout << ", ";
+        }
+        cout << ")";
+
+        cout << "\ny_train_cd: (";
+        for (int i = 0; i < y_train_cd.dim(); i++)
+        {
+            cout << y_train_cd.getShape()[i];
+            if (i != y_train_cd.dim() - 1)
+                cout << ", ";
+        }
+        cout << ")";
+
+        cout << "\nX_val_cd: (";
+        for (int i = 0; i < X_val_cd.dim(); i++)
+        {
+            cout << X_val_cd.getShape()[i];
+            if (i != X_val_cd.dim() - 1)
+                cout << ", ";
+        }
+        cout << ")";
+
+        cout << "\ny_val_cd: (";
+        for (int i = 0; i < y_val_cd.dim(); i++)
+        {
+            cout << y_val_cd.getShape()[i];
+            if (i != y_val_cd.dim() - 1)
+                cout << ", ";
+        }
+        cout << ")";
+
+        cout << "\nX_test_cd: (";
+        for (int i = 0; i < X_test_cd.dim(); i++)
+        {
+            cout << X_test_cd.getShape()[i];
+            if (i != X_test_cd.dim() - 1)
+                cout << ", ";
+        }
+        cout << ")";
+
+        cout << "\ny_test_cd: (";
+        for (int i = 0; i < y_test_cd.dim(); i++)
+        {
+            cout << y_test_cd.getShape()[i];
+            if (i != y_test_cd.dim() - 1)
                 cout << ", ";
         }
         cout << ")";
@@ -1388,6 +1453,86 @@ int main()
         predict_cnn(jetson_model, loaded.toCUDA(), loaded_label.toCUDA(), 0);
         predict_cnn_custom(jetson_model, X_test_meteors.toCUDA(), 87);
         predict_cnn_custom(jetson_model, loaded2.toCUDA(), 0);
+
+        cout << "\n\nPets prediction test\n\n";
+        
+        save_cnn_image(X_test_cd, 37, "C:/Users/ASUS/Downloads/Fulcrum_pets_images/pet37.png");
+        CPUTensor load_pet = load_img("C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Dog3_pug.png");
+        save_cnn_image(load_pet, 0, "C:/Users/ASUS/Downloads/Fulcrum_images_to_load/resized_dog3_pug.png");
+        CNN_model pets_model = load_cnn("C:/Users/ASUS/Downloads/Fulcrum_save_tests/pets_model1.bin", true);
+        predict_pet(pets_model, X_test_cd.toCUDA(), y_test_cd.toCUDA(), 37);
+        predict_pet_custom(pets_model, X_test_cd.toCUDA(), 37);
+        predict_pet_custom(pets_model, load_pet.toCUDA(), 0);
+
+        cout << "\n\nDataloader object test!\n\n";
+
+        DataLoader loader1(X_test_cd.toCUDA(), y_test_cd.toCUDA());
+
+        cout << loader1.batch_size << " " << loader1.nr_labels() << " " << loader1.nr_samples() << " " << loader1.size() << "\n\n";
+
+        Tensor loader_batch_samples = loader1[3].sample;
+        Tensor loader_batch_labels = loader1[3].label;
+
+        cout << "(";
+        for (int i = 0; i < loader_batch_samples.dim(); i++)
+        {
+            cout << loader_batch_samples.getShape()[i];
+
+            if (i < loader_batch_samples.dim() - 1)
+                cout << ", ";
+        }
+        cout << ")\n";
+
+        loader_batch_labels.toCPU().print_dims();
+
+
+        cout << "\n\nCUDA Cats vs Dogs dataset test\n\n";
+
+        {
+            vector<convStats> cv_pets = {
+                {3, 16, 3, 2, 2, 1},
+                {16, 32, 3, 1, 1, 1},
+                {32, 64, 3, 1, 1, 1},
+                {64, 128, 3, 1, 1, 1}
+            };
+
+            vector<MaxPoolStats> mx_pets = {
+                {2, 2, 2, 0},
+                {2, 2, 2, 0},
+                {2, 2, 2, 0},
+                {1, 1, 1, 0}
+            };
+
+            start = chrono::high_resolution_clock::now();
+
+            CPUTensor::setSeed(42);
+
+            Parameters params_pets = init_conv(cv_pets, mx_pets, X_train_cd.toCUDA(), y_train_cd.getShape()[0], "relu");
+            CNN_model pets_model1(params_pets, cv_pets, mx_pets, "relu");
+
+            train_cnn(pets_model1, X_train_cd.toCUDA(), X_val_cd.toCUDA(), y_train_cd.toCUDA(), y_val_cd.toCUDA(), 0.001f, 400, 27, 0.10f, 0.0f, 0.1f, true);
+
+            cudaDeviceSynchronize();
+
+            Forward pets_eval1 = conv_frdpass(pets_model1.params, X_test_cd.toCUDA(), pets_model1.cv_stats, pets_model1.mx_stats, pets_model1.activ);
+            Forward pets_eval2 = conv_frdpass(pets_model1.params, X_val_cd.toCUDA(), pets_model1.cv_stats, pets_model1.mx_stats, pets_model1.activ);
+
+            float test_cost = cost(y_test_cd.toCUDA(), pets_eval1.A[pets_model1.params.W.size() - 1], pets_model1.params);
+            float returned_cost = cost(y_val_cd.toCUDA(), pets_eval2.A[pets_model1.params.W.size() - 1], pets_model1.params);
+
+            cudaDeviceSynchronize();
+
+            cout << "Returned model cost: " << returned_cost << "\n";
+            cout << "Test model cost: " << test_cost << "\n";
+
+            end = chrono::high_resolution_clock::now();
+
+            elapsed = end - start;
+
+            cout << "Pets training time: " << elapsed.count() << " seconds\n";
+
+            save_cnn(pets_model1, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/pets_model1.bin", true);
+        }
 
 
         cout << "\n\nCUDA Meteors dataset test\n\n";

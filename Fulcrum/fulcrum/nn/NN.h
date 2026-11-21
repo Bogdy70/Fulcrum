@@ -159,4 +159,8 @@ namespace fulcrum::nn
     void predict_cnn(const CNN_model& model, const Tensor& X, const Tensor& y, int idx);
 
     void predict_cnn_custom(const CNN_model& model, const Tensor& X, int idx, bool type = 0);
+
+    void predict_pet(const CNN_model& model, const Tensor& X, const Tensor& y, int idx);
+
+    void predict_pet_custom(const CNN_model& model, const Tensor& X, int idx, bool type = 0);
 }

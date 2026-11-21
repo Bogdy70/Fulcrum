@@ -6,6 +6,72 @@ using namespace std;
 
 namespace fulcrum::data
 {
+    int DataLoader::size() const
+    {
+        return ceil(static_cast<float>(samples.getShape()[0]) / batch_size);
+    }
+
+    int DataLoader::nr_samples() const
+    {
+        return samples.getShape()[0];
+    }
+
+    int DataLoader::nr_labels() const
+    {
+        return labels.getShape()[1];
+    }
+
+    DataLoader::Batch DataLoader::operator[](int index)
+    {
+        DataLoader::Batch batch;
+
+        CPUTensor samples_cpu = samples.toCPU();
+        CPUTensor labels_cpu = labels.toCPU();
+
+        int C = samples.getShape()[1];
+        int H = samples.getShape()[2];
+        int W = samples.getShape()[3];
+        int classes = labels.getShape()[0];
+
+        int save_batch_size = index == size() - 1 && static_cast<float>(samples.getShape()[0]) / batch_size - index != 0 ? samples.getShape()[0] - (index * batch_size) : batch_size;
+
+        CPUTensor sample_cpu = Tensor::zeros({ save_batch_size, C, H, W }).toCPU();
+        CPUTensor label_cpu = Tensor::zeros({ classes, save_batch_size }).toCPU();
+
+        for (int b = batch_size * index; b < (batch_size * index) + save_batch_size; b++)
+        {
+            for (int c = 0; c < C; c++)
+            {
+                for (int h = 0; h < H; h++)
+                {
+                    for (int w = 0; w < W; w++)
+                    {
+                        int other_idx = b * C * H * W + c * H * W + h * W + w;
+                        int save_idx = b % save_batch_size * C * H * W + c * H * W + h * W + w;
+
+                        sample_cpu(save_idx) = samples_cpu(other_idx);
+                    }
+                }
+            }
+        }
+
+        for (int cl = 0; cl < classes; cl++)
+        {
+            for (int b = batch_size * index; b < (batch_size * index) + save_batch_size; b++)
+            {
+                int other_idx = cl * nr_labels() + b;
+                int save_idx = cl * nr_labels() + b % save_batch_size;
+
+                label_cpu(save_idx) = labels_cpu(other_idx);
+            }
+        }
+
+        batch.sample = sample_cpu.toCUDA();
+        batch.label = label_cpu.toCUDA();
+
+        return batch;
+    }
+
     void printMnistImage(const CPUTensor& img, int sample_idx)
     {
         for (int i = 0; i < 784; i++)
