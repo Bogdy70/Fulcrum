@@ -25,9 +25,6 @@ namespace fulcrum::data
     {
         DataLoader::Batch batch;
 
-        CPUTensor samples_cpu = samples.toCPU();
-        CPUTensor labels_cpu = labels.toCPU();
-
         int C = samples.getShape()[1];
         int H = samples.getShape()[2];
         int W = samples.getShape()[3];
@@ -35,8 +32,8 @@ namespace fulcrum::data
 
         int save_batch_size = index == size() - 1 && static_cast<float>(samples.getShape()[0]) / batch_size - index != 0 ? samples.getShape()[0] - (index * batch_size) : batch_size;
 
-        CPUTensor sample_cpu = Tensor::zeros({ save_batch_size, C, H, W }).toCPU();
-        CPUTensor label_cpu = Tensor::zeros({ classes, save_batch_size }).toCPU();
+        batch.sample = CPUTensor({ save_batch_size, C, H, W });
+        batch.label = CPUTensor({ classes, save_batch_size });
 
         for (int b = batch_size * index; b < (batch_size * index) + save_batch_size; b++)
         {
@@ -49,7 +46,7 @@ namespace fulcrum::data
                         int other_idx = b * C * H * W + c * H * W + h * W + w;
                         int save_idx = (b - index * batch_size) * C * H * W + c * H * W + h * W + w;
 
-                        sample_cpu(save_idx) = samples_cpu(other_idx);
+                        batch.sample(save_idx) = samples(other_idx);
                     }
                 }
             }
@@ -62,12 +59,9 @@ namespace fulcrum::data
                 int other_idx = cl * nr_labels() + b;
                 int save_idx = cl * save_batch_size + (b - index * batch_size);
 
-                label_cpu(save_idx) = labels_cpu(other_idx);
+                batch.label(save_idx) = labels(other_idx);
             }
         }
-
-        batch.sample = sample_cpu.toCUDA();
-        batch.label = label_cpu.toCUDA();
 
         return batch;
     }
@@ -76,9 +70,6 @@ namespace fulcrum::data
     {
         DataLoader::Batch batch;
 
-        CPUTensor samples_cpu = samples.toCPU();
-        CPUTensor labels_cpu = labels.toCPU();
-
         int C = samples.getShape()[1];
         int H = samples.getShape()[2];
         int W = samples.getShape()[3];
@@ -86,8 +77,8 @@ namespace fulcrum::data
 
         int save_batch_size = index == size() - 1 && static_cast<float>(samples.getShape()[0]) / batch_size - index != 0 ? samples.getShape()[0] - (index * batch_size) : batch_size;
 
-        CPUTensor sample_cpu = Tensor::zeros({ save_batch_size, C, H, W }).toCPU();
-        CPUTensor label_cpu = Tensor::zeros({ classes, save_batch_size }).toCPU();
+        batch.sample = CPUTensor({ save_batch_size, C, H, W });
+        batch.label = CPUTensor({ classes, save_batch_size });
 
         for (int b = batch_size * index; b < (batch_size * index) + save_batch_size; b++)
         {
@@ -100,7 +91,7 @@ namespace fulcrum::data
                         int other_idx = b * C * H * W + c * H * W + h * W + w;
                         int save_idx = (b - index * batch_size) * C * H * W + c * H * W + h * W + w;
 
-                        sample_cpu(save_idx) = samples_cpu(other_idx);
+                        batch.sample(save_idx) = samples(other_idx);
                     }
                 }
             }
@@ -113,12 +104,9 @@ namespace fulcrum::data
                 int other_idx = cl * nr_labels() + b;
                 int save_idx = cl * save_batch_size + (b - index * batch_size);
 
-                label_cpu(save_idx) = labels_cpu(other_idx);
+                batch.label(save_idx) = labels(other_idx);
             }
         }
-
-        batch.sample = sample_cpu.toCUDA();
-        batch.label = label_cpu.toCUDA();
 
         return batch;
     }

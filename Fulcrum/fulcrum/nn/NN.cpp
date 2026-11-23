@@ -387,8 +387,11 @@ namespace fulcrum::nn
 
             if (epoch > 0)
             {
-                for (auto [sample, label] : train_data)
+                for (auto [sample_cpu, label_cpu] : train_data)
                 {
+                    Tensor sample = sample_cpu.toCUDA();
+                    Tensor label = label_cpu.toCUDA();
+
                     Forward train_frd_cache = conv_frdpass(model.params, sample, model.cv_stats, model.mx_stats, model.activ, dropout);
 
                     if (epoch % viewing_rate == 0 || epoch == epochs)
@@ -413,8 +416,11 @@ namespace fulcrum::nn
 
             if (epoch % viewing_rate == 0 || epoch == epochs || restore_best != 0 || early_stopping != 0)
             {
-                for (auto [sample, label] : test_data)
+                for (auto [sample_cpu, label_cpu] : test_data)
                 {
+                    Tensor sample = sample_cpu.toCUDA();
+                    Tensor label = label_cpu.toCUDA();
+
                     cudaDeviceSynchronize();
 
                     int n = label.getShape()[1];

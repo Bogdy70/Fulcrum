@@ -11,11 +11,11 @@ namespace fulcrum::data
 {
 	struct DataLoader
 	{
-		Tensor samples;
-		Tensor labels;
+		CPUTensor samples;
+		CPUTensor labels;
 		int batch_size;
 
-		DataLoader(const Tensor& X, const Tensor& y, int batch_size = 32)
+		DataLoader(const CPUTensor& X, const CPUTensor& y, int batch_size = 32)
 		{
 			if (X.dim() != 4)
 				throw runtime_error("Samples dataset must be 4 dimensional!");
@@ -23,8 +23,8 @@ namespace fulcrum::data
 			if (y.dim() != 2)
 				throw runtime_error("Labels dataset must be 2 dimensional!");
 
-			this->samples = X.clone();
-			this->labels = y.clone();
+			this->samples = X;
+			this->labels = y;
 			this->batch_size = batch_size;
 		}
 
@@ -36,8 +36,8 @@ namespace fulcrum::data
 
 		struct Batch
 		{
-			Tensor sample;
-			Tensor label;
+			CPUTensor sample;
+			CPUTensor label;
 		};
 
 		Batch operator[](int index);

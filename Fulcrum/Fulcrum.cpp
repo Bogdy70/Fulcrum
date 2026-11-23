@@ -1107,8 +1107,8 @@ int main()
         Parameters cnn_params_test1 = init_conv(cv_stats1, mx_stats1, Img, Y_Img.getShape()[0], "relu");
         AdamState cnn_state_test1(cnn_params_test1);
         CNN_model cnn_model_test1(cnn_params_test1, cv_stats1, mx_stats1, "relu", cnn_state_test1);
-        DataLoader train_loader_test1(Img, Y_Img);
-        DataLoader test_loader_test1(Imgtest, Y_Imgtest);
+        DataLoader train_loader_test1(Img.toCPU(), Y_Img.toCPU());
+        DataLoader test_loader_test1(Imgtest.toCPU(), Y_Imgtest.toCPU());
 
         train_cnn(cnn_model_test1, train_loader_test1, test_loader_test1, 0.001f, 1000, 100);
 
@@ -1468,12 +1468,12 @@ int main()
 
         cout << "\n\nDataloader object test!\n\n";
 
-        DataLoader loader1(X_test_cd.toCUDA(), y_test_cd.toCUDA());
+        DataLoader loader1(X_test_cd, y_test_cd);
 
         cout << loader1.batch_size << " " << loader1.nr_labels() << " " << loader1.nr_samples() << " " << loader1.size() << "\n\n";
 
-        Tensor loader_batch_samples = loader1[2].sample;
-        Tensor loader_batch_labels = loader1[3].label;
+        CPUTensor loader_batch_samples = loader1[2].sample;
+        CPUTensor loader_batch_labels = loader1[3].label;
 
         cout << "(";
         for (int i = 0; i < loader_batch_samples.dim(); i++)
@@ -1485,13 +1485,13 @@ int main()
         }
         cout << ")\n";
 
-        loader_batch_labels.toCPU().print_dims();
+        loader_batch_labels.print_dims();
         cout << "\n";
 
         for (auto [sample, label] : loader1)
         {
-            sample.toCPU().print_dims();
-            label.toCPU().print_dims();
+            sample.print_dims();
+            label.print_dims();
             cout << "\n";
         }
 
@@ -1519,8 +1519,8 @@ int main()
 
             Parameters params_pets = init_conv(cv_pets, mx_pets, X_train_cd.toCUDA(), y_train_cd.getShape()[0], "relu");
             CNN_model pets_model1(params_pets, cv_pets, mx_pets, "relu");
-            DataLoader train_loader_cd(X_train_cd.toCUDA(), y_train_cd.toCUDA());
-            DataLoader test_loader_cd(X_val_cd.toCUDA(), y_val_cd.toCUDA());
+            DataLoader train_loader_cd(X_train_cd, y_train_cd);
+            DataLoader test_loader_cd(X_val_cd, y_val_cd);
 
             train_cnn(pets_model1, train_loader_cd, test_loader_cd, 0.001f, 400, 27, 0.10f, 0.0f, 0.1f, true);
 
@@ -1581,8 +1581,8 @@ int main()
             Parameters params_stopping = init_conv(cv_cnn, mx_cnn, X_train_cnn.toCUDA(), y_train_cnn.getShape()[0], "relu");
             AdamState state_stopping(params_stopping);
             CNN_model model_stopping(params_stopping, cv_cnn, mx_cnn, "relu", state_stopping);
-            DataLoader train_loader_cnn(X_train_cnn.toCUDA(), y_train_cnn.toCUDA());
-            DataLoader test_loader_cnn(X_test_cnn.toCUDA(), y_test_cnn.toCUDA());
+            DataLoader train_loader_cnn(X_train_cnn, y_train_cnn);
+            DataLoader test_loader_cnn(X_test_cnn, y_test_cnn);
 
             train_cnn(model_stopping, train_loader_cnn, test_loader_cnn, 0.001f, 90, 10, 0.0f, 0.0f, 0.1f, true);
 
@@ -1609,8 +1609,8 @@ int main()
             save_cnn(model_stopping, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/Jeston_test.bin", true);
         }
 
-        DataLoader train_loader_meteors(X_train_meteors.toCUDA(), y_train_meteors.toCUDA());
-        DataLoader test_loader_meteors(X_val_meteors.toCUDA(), y_val_meteors.toCUDA());
+        DataLoader train_loader_meteors(X_train_meteors, y_train_meteors);
+        DataLoader test_loader_meteors(X_val_meteors, y_val_meteors);
 
         {
             cout << "Best config train run\n\n";
@@ -1878,8 +1878,8 @@ int main()
         Parameters cnn_params_cifar10 = init_conv(cv_cnn, mx_cnn, X_train_cnn.toCUDA(), y_train_cnn.getShape()[0], "relu");
         AdamState cnn_state_cifar10(cnn_params_cifar10);
         CNN_model cnn_model_cifar10(cnn_params_cifar10, cv_cnn, mx_cnn, "relu", cnn_state_cifar10);
-        DataLoader train_loader_cifar10(X_train_cnn.toCUDA(), y_train_cnn.toCUDA());
-        DataLoader test_loader_cifar10(X_test_cnn.toCUDA(), y_test_cnn.toCUDA());
+        DataLoader train_loader_cifar10(X_train_cnn, y_train_cnn);
+        DataLoader test_loader_cifar10(X_test_cnn, y_test_cnn);
 
         train_cnn(cnn_model_cifar10, train_loader_cifar10, test_loader_cifar10, 0.001f, 1000, 100);
 
