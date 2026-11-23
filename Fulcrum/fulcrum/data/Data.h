@@ -47,17 +47,26 @@ namespace fulcrum::data
 		struct Iterator
 		{
 			int position;
+			DataLoader* owner;
 
-			int operator*() const
+			Batch operator*() const
 			{
-				return position;
+				return (*owner)[position];
 			}
 
 			void operator++()
 			{
 				++position;
 			}
+
+			bool operator!=(const Iterator& other) const
+			{
+				return this->position != other.position;
+			}
 		};
+
+		Iterator begin() { return { 0, this }; }
+		Iterator end() { return { size(), this }; }
 	};
 
 	void printMnistImage(const CPUTensor& img, int sample_idx);

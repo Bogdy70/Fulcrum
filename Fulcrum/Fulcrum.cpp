@@ -1107,8 +1107,10 @@ int main()
         Parameters cnn_params_test1 = init_conv(cv_stats1, mx_stats1, Img, Y_Img.getShape()[0], "relu");
         AdamState cnn_state_test1(cnn_params_test1);
         CNN_model cnn_model_test1(cnn_params_test1, cv_stats1, mx_stats1, "relu", cnn_state_test1);
+        DataLoader train_loader_test1(Img, Y_Img);
+        DataLoader test_loader_test1(Imgtest, Y_Imgtest);
 
-        train_cnn(cnn_model_test1, Img, Imgtest, Y_Img, Y_Imgtest, 0.001f, 1000, 100);
+        train_cnn(cnn_model_test1, train_loader_test1, test_loader_test1, 0.001f, 1000, 100);
 
         cout << "\n\nSimple text Write + Read test";
         {
@@ -1484,6 +1486,14 @@ int main()
         cout << ")\n";
 
         loader_batch_labels.toCPU().print_dims();
+        cout << "\n";
+
+        for (auto [sample, label] : loader1)
+        {
+            sample.toCPU().print_dims();
+            label.toCPU().print_dims();
+            cout << "\n";
+        }
 
 
         cout << "\n\nCUDA Cats vs Dogs dataset test\n\n";
@@ -1509,8 +1519,10 @@ int main()
 
             Parameters params_pets = init_conv(cv_pets, mx_pets, X_train_cd.toCUDA(), y_train_cd.getShape()[0], "relu");
             CNN_model pets_model1(params_pets, cv_pets, mx_pets, "relu");
+            DataLoader train_loader_cd(X_train_cd.toCUDA(), y_train_cd.toCUDA());
+            DataLoader test_loader_cd(X_val_cd.toCUDA(), y_val_cd.toCUDA());
 
-            train_cnn(pets_model1, X_train_cd.toCUDA(), X_val_cd.toCUDA(), y_train_cd.toCUDA(), y_val_cd.toCUDA(), 0.001f, 400, 27, 0.10f, 0.0f, 0.1f, true);
+            train_cnn(pets_model1, train_loader_cd, test_loader_cd, 0.001f, 400, 27, 0.10f, 0.0f, 0.1f, true);
 
             cudaDeviceSynchronize();
 
@@ -1569,8 +1581,10 @@ int main()
             Parameters params_stopping = init_conv(cv_cnn, mx_cnn, X_train_cnn.toCUDA(), y_train_cnn.getShape()[0], "relu");
             AdamState state_stopping(params_stopping);
             CNN_model model_stopping(params_stopping, cv_cnn, mx_cnn, "relu", state_stopping);
+            DataLoader train_loader_cnn(X_train_cnn.toCUDA(), y_train_cnn.toCUDA());
+            DataLoader test_loader_cnn(X_test_cnn.toCUDA(), y_test_cnn.toCUDA());
 
-            train_cnn(model_stopping, X_train_cnn.toCUDA(), X_test_cnn.toCUDA(), y_train_cnn.toCUDA(), y_test_cnn.toCUDA(), 0.001f, 90, 10, 0.0f, 0.0f, 0.1f, true);
+            train_cnn(model_stopping, train_loader_cnn, test_loader_cnn, 0.001f, 90, 10, 0.0f, 0.0f, 0.1f, true);
 
             cudaDeviceSynchronize();
 
@@ -1595,6 +1609,9 @@ int main()
             save_cnn(model_stopping, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/Jeston_test.bin", true);
         }
 
+        DataLoader train_loader_meteors(X_train_meteors.toCUDA(), y_train_meteors.toCUDA());
+        DataLoader test_loader_meteors(X_val_meteors.toCUDA(), y_val_meteors.toCUDA());
+
         {
             cout << "Best config train run\n\n";
 
@@ -1606,7 +1623,7 @@ int main()
             AdamState state_best(params_best);
             CNN_model model_best(params_best, cv_meteors, mx_meteors, "relu", state_best);
 
-            train_cnn(model_best, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 177, 17, 0.0f, 0.0f, 0.1f, true);
+            train_cnn(model_best, train_loader_meteors, test_loader_meteors, 0.001f, 177, 17, 0.0f, 0.0f, 0.1f, true);
 
             cudaDeviceSynchronize();
 
@@ -1676,7 +1693,7 @@ int main()
             AdamState state1(params_test1);
             CNN_model model1(params_test1, cv_meteors, mx_meteors, "relu", state1);
 
-            train_cnn(model1, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17);
+            train_cnn(model1, train_loader_meteors, test_loader_meteors, 0.001f, 150, 17);
 
             cudaDeviceSynchronize();
 
@@ -1698,7 +1715,7 @@ int main()
             AdamState state2(params_test2);
             CNN_model model2(params_test2, cv_meteors, mx_meteors, "relu", state2);
 
-            train_cnn(model2, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.2f);
+            train_cnn(model2, train_loader_meteors, test_loader_meteors, 0.001f, 150, 17, 0.2f);
 
             cudaDeviceSynchronize();
 
@@ -1720,7 +1737,7 @@ int main()
             AdamState state3(params_test3);
             CNN_model model3(params_test3, cv_meteors, mx_meteors, "relu", state3);
 
-            train_cnn(model3, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.0f, 0.0f, 0.1f);
+            train_cnn(model3, train_loader_meteors, test_loader_meteors, 0.001f, 150, 17, 0.0f, 0.0f, 0.1f);
 
             cudaDeviceSynchronize();
 
@@ -1742,7 +1759,7 @@ int main()
             AdamState state4(params_test4);
             CNN_model model4(params_test4, cv_meteors, mx_meteors, "relu", state4);
 
-            train_cnn(model4, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.2f, 0.0f, 0.1f);
+            train_cnn(model4, train_loader_meteors, test_loader_meteors, 0.001f, 150, 17, 0.2f, 0.0f, 0.1f);
 
             cudaDeviceSynchronize();
 
@@ -1764,7 +1781,7 @@ int main()
             AdamState state5(params_test5);
             CNN_model model5(params_test5, cv_meteors, mx_meteors, "tanh", state5);
 
-            train_cnn(model5, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17);
+            train_cnn(model5, train_loader_meteors, test_loader_meteors, 0.001f, 150, 17);
 
             cudaDeviceSynchronize();
 
@@ -1786,7 +1803,7 @@ int main()
             AdamState state6(params_test6);
             CNN_model model6(params_test6, cv_meteors, mx_meteors, "tanh", state6);
 
-            train_cnn(model6, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.2f);
+            train_cnn(model6, train_loader_meteors, test_loader_meteors, 0.001f, 150, 17, 0.2f);
 
             cudaDeviceSynchronize();
 
@@ -1808,7 +1825,7 @@ int main()
             AdamState state7(params_test7);
             CNN_model model7(params_test7, cv_meteors, mx_meteors, "tanh", state7);
 
-            train_cnn(model7, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.0f, 0.0f, 0.1f);
+            train_cnn(model7, train_loader_meteors, test_loader_meteors, 0.001f, 150, 17, 0.0f, 0.0f, 0.1f);
 
             cudaDeviceSynchronize();
 
@@ -1830,7 +1847,7 @@ int main()
             AdamState state8(params_test8);
             CNN_model model8(params_test8, cv_meteors, mx_meteors, "tanh", state8);
 
-            train_cnn(model8, X_train_meteors.toCUDA(), X_val_meteors.toCUDA(), y_train_meteors.toCUDA(), y_val_meteors.toCUDA(), 0.001f, 150, 17, 0.2f, 0.0f, 0.1f);
+            train_cnn(model8, train_loader_meteors, test_loader_meteors, 0.001f, 150, 17, 0.2f, 0.0f, 0.1f);
 
             cudaDeviceSynchronize();
 
@@ -1861,8 +1878,10 @@ int main()
         Parameters cnn_params_cifar10 = init_conv(cv_cnn, mx_cnn, X_train_cnn.toCUDA(), y_train_cnn.getShape()[0], "relu");
         AdamState cnn_state_cifar10(cnn_params_cifar10);
         CNN_model cnn_model_cifar10(cnn_params_cifar10, cv_cnn, mx_cnn, "relu", cnn_state_cifar10);
+        DataLoader train_loader_cifar10(X_train_cnn.toCUDA(), y_train_cnn.toCUDA());
+        DataLoader test_loader_cifar10(X_test_cnn.toCUDA(), y_test_cnn.toCUDA());
 
-        train_cnn(cnn_model_cifar10, X_train_cnn.toCUDA(), X_test_cnn.toCUDA(), y_train_cnn.toCUDA(), y_test_cnn.toCUDA(), 0.001f, 1000, 100);
+        train_cnn(cnn_model_cifar10, train_loader_cifar10, test_loader_cifar10, 0.001f, 1000, 100);
 
         cudaDeviceSynchronize();
 

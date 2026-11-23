@@ -3,11 +3,13 @@
 #include <fulcrum/Tensor.cuh>
 #include <fulcrum/optim/Optim.h>
 #include <fulcrum/CPUTensor.h>
+#include <fulcrum/data/Data.h>
 #include <string>
 #include <stdexcept>
 #include <chrono>
 
 using namespace fulcrum::optim;
+using namespace fulcrum::data;
 
 namespace fulcrum::nn
 {
@@ -126,10 +128,8 @@ namespace fulcrum::nn
         const float lambda_l2 = 0.0f);
 
     CNN_model& train_cnn(CNN_model& model,
-        const Tensor& Xtrain,
-        const Tensor& Xtest,
-        const Tensor& ytrain,
-        const Tensor& ytest,
+        data::DataLoader& train_data,
+        data::DataLoader& test_data,
         float lr,
         int epochs,
         int viewing_rate,

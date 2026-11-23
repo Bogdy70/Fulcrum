@@ -1,5 +1,4 @@
 #include <fulcrum/nn/NN.h>
-#include <fulcrum/data/Data.h>
 #include <iostream>
 
 using namespace std;
@@ -334,10 +333,8 @@ namespace fulcrum::nn
     }
 
     CNN_model& train_cnn(CNN_model& model,
-        const Tensor& Xtrain,
-        const Tensor& Xtest,
-        const Tensor& ytrain,
-        const Tensor& ytest,
+        DataLoader& train_data,
+        DataLoader& test_data,
         float lr,
         int epochs,
         int viewing_rate,
@@ -367,6 +364,13 @@ namespace fulcrum::nn
                 throw runtime_error("Only one restore option can be selected!");
         }
 
+        float train_cost_sum = 0.0f;
+        float train_accuracy_sum = 0.0f;
+        float train_objective_sum = 0.0f;
+        float test_cost_sum = 0.0f;
+        float test_accuracy_sum = 0.0f;
+        int total_train_nr = train_data.nr_samples();
+        int total_test_nr = test_data.nr_samples();
         float reference_cost = numeric_limits<float>::infinity();
         float reference_cost_best = numeric_limits<float>::infinity();
         Parameters best_params(model.params.W.size());
@@ -375,14 +379,63 @@ namespace fulcrum::nn
 
         for (int epoch = 0; epoch <= epochs; epoch++)
         {
+            test_cost_sum = 0.0f;
+            test_accuracy_sum = 0.0f;
+            train_objective_sum = 0.0f;
+            train_cost_sum = 0.0f;
+            train_accuracy_sum = 0.0f;
+
+            if (epoch > 0)
+            {
+                for (auto [sample, label] : train_data)
+                {
+                    Forward train_frd_cache = conv_frdpass(model.params, sample, model.cv_stats, model.mx_stats, model.activ, dropout);
+
+                    if (epoch % viewing_rate == 0 || epoch == epochs)
+                    {
+                        cudaDeviceSynchronize();
+
+                        int n = label.getShape()[1];
+
+                        float train_objective = cost(label, train_frd_cache.A[size(model.params.W) - 1], model.params, lambda_l1, lambda_l2);
+                        float train_cost = cost(label, train_frd_cache.A[size(model.params.W) - 1], model.params);
+                        float train_accuracy = accuracy(label, train_frd_cache.A[size(model.params.W) - 1]);
+
+                        train_objective_sum += train_objective * n;
+                        train_cost_sum += train_cost * n;
+                        train_accuracy_sum += train_accuracy * n;
+                    }
+
+                    Backward cnn_grads = conv_bckprop(train_frd_cache, model.params, label, model.cv_stats, model.mx_stats, model.activ, dropout, lambda_l1, lambda_l2);
+                    adam(model.params, cnn_grads, model.state, lr, beta1, beta2, eps);
+                }
+            }
+
+            if (epoch % viewing_rate == 0 || epoch == epochs || restore_best != 0 || early_stopping != 0)
+            {
+                for (auto [sample, label] : test_data)
+                {
+                    cudaDeviceSynchronize();
+
+                    int n = label.getShape()[1];
+
+                    Forward test_frd_cache = conv_frdpass(model.params, sample, model.cv_stats, model.mx_stats, model.activ);
+
+                    float test_cost = cost(label, test_frd_cache.A[size(model.params.W) - 1], model.params);
+                    float test_accuracy = accuracy(label, test_frd_cache.A[size(model.params.W) - 1]);
+
+                    test_cost_sum += test_cost * n;
+                    test_accuracy_sum += test_accuracy * n;
+                }
+            }
+
+            float test_cost_total = test_cost_sum / total_test_nr;
+
             if (restore_best != 0 || early_stopping != 0)
             {
-                Forward test_frd_cache = conv_frdpass(model.params, Xtest, model.cv_stats, model.mx_stats, model.activ);
-                float test_cost = cost(ytest, test_frd_cache.A[size(model.params.W) - 1], model.params);
-
-                if (restore_best != 0 && target_loss == 0 && test_cost <= reference_cost_best)
+                if (restore_best != 0 && target_loss == 0 && test_cost_total <= reference_cost_best)
                 {
-                    reference_cost_best = test_cost;
+                    reference_cost_best = test_cost_total;
                     best_params = clone_params(model.params);
                     snapshot = true;
                 }
@@ -390,15 +443,15 @@ namespace fulcrum::nn
                 {
                     if (target_loss != 0)
                     {
-                        if (test_cost <= target_loss + target_tolerance)
+                        if (test_cost_total <= target_loss + target_tolerance)
                             break;
                     }
                     else
                     {
-                        if (test_cost < reference_cost - min_delta)
+                        if (test_cost_total < reference_cost - min_delta)
                         {
                             counter = 0;
-                            reference_cost = test_cost;
+                            reference_cost = test_cost_total;
                             if (restore_meaningful != 0)
                             {
                                 best_params = clone_params(model.params);
@@ -410,7 +463,7 @@ namespace fulcrum::nn
                             counter++;
                             if (counter >= patience)
                             {
-                                cout << "Epoch: " << epoch << " || Cost: " << test_cost << " || Ref: " << reference_cost << " || Counter: " << counter << "\n";
+                                cout << "Epoch: " << epoch << " || Cost: " << test_cost_total << " || Ref: " << reference_cost << " || Counter: " << counter << "\n";
                                 break;
                             }
                         }
@@ -418,34 +471,17 @@ namespace fulcrum::nn
                 }
             }
 
-            if (epoch % viewing_rate == 0 || epoch == epochs)
+            auto current_time = chrono::high_resolution_clock::now();
+            chrono::duration<double> time = current_time - start_time;
+
+            if (epoch == 0)
+                cout << "Epoch: " << epoch << " || Test cost: " << test_cost_sum / total_test_nr << " || Test acc: " << test_accuracy_sum / total_test_nr * 100.0f << " % || Time: " << time.count() << " sec\n";
+            else
             {
-                cudaDeviceSynchronize();
-
-                Forward train_frd_cache = conv_frdpass(model.params, Xtrain, model.cv_stats, model.mx_stats, model.activ);
-                Forward test_frd_cache = conv_frdpass(model.params, Xtest, model.cv_stats, model.mx_stats, model.activ);
-
-                float train_objective = cost(ytrain, train_frd_cache.A[size(model.params.W) - 1], model.params, lambda_l1, lambda_l2);
-                float train_cost = cost(ytrain, train_frd_cache.A[size(model.params.W) - 1], model.params);
-                float train_accuracy = accuracy(ytrain, train_frd_cache.A[size(model.params.W) - 1]);
-
-                float test_cost = cost(ytest, test_frd_cache.A[size(model.params.W) - 1], model.params);
-                float test_accuracy = accuracy(ytest, test_frd_cache.A[size(model.params.W) - 1]);
-
-                auto current_time = chrono::high_resolution_clock::now();
-                chrono::duration<double> time = current_time - start_time;
-
-                cout << "Epoch: " << epoch << " || Train objective: " << train_objective << " || Train cost: " << train_cost << " || Test cost: " << test_cost << " || Train acc: " << train_accuracy * 100.0f << " % || Test acc: " << test_accuracy * 100.0f << " % || Time: " << time.count() << " sec\n";
+                if (epoch % viewing_rate == 0 || epoch == epochs)
+                    cout << "Epoch: " << epoch << " || Train objective: " << train_objective_sum / total_train_nr << " || Train cost: " << train_cost_sum / total_train_nr << " || Test cost: " << test_cost_sum / total_test_nr << " || Train acc: " << train_accuracy_sum / total_train_nr * 100.0f << " % || Test acc: " << test_accuracy_sum / total_test_nr * 100.0f << " % || Time: " << time.count() << " sec\n";
             }
-
-            if (epoch == epochs)
-                break;
-
-            Forward cnn_frd_cache = conv_frdpass(model.params, Xtrain, model.cv_stats, model.mx_stats, model.activ, dropout);
-            Backward cnn_grads = conv_bckprop(cnn_frd_cache, model.params, ytrain, model.cv_stats, model.mx_stats, model.activ, dropout, lambda_l1, lambda_l2);
-            adam(model.params, cnn_grads, model.state, lr, beta1, beta2, eps);
         }
-
         if ((restore_best != 0 || restore_meaningful != 0) && snapshot != 0)
             model.params = move(best_params);
 
