@@ -5,6 +5,7 @@
 #include <fulcrum/Tensor.cuh>
 #include <fulcrum/CPUTensor.h>
 #include <fulcrum/nn/NN.h>
+#include <iostream>
 
 using namespace fulcrum::nn;
 
@@ -30,4 +31,10 @@ namespace fulcrum::io
 		const CPUTensor& X,
 		int imgIdx,
 		const std::filesystem::path& path);
+
+	CPUTensor load_img(const cv::String& path, bool resize = true, int size = 128);
+
+	CPUTensor loadMatrixBin(const std::string& filepath, int rows, int cols);
+
+	CPUTensor loadTensorBin(const std::string& filepath, const std::vector<int>& shape);
 }

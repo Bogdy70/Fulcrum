@@ -633,15 +633,16 @@ namespace fulcrum::io
         const auto shape = X.getShape();
 
         if (X.getDataType() != DataType::float32 ||
-            shape.size() != 4 || shape[1] != 3)
+            shape.size() != 4 || (shape[1] != 1 && shape[1] != 3))
         {
             throw std::runtime_error(
-                "Expected float32 images shaped (batch, 3, H, W).");
+                "Expected float32 images shaped (batch, C, H, W), with C=1 or C=3.");
         }
 
         if (imgIdx < 0 || imgIdx >= shape[0])
             throw std::runtime_error("Image index out of range.");
 
+        const int C = shape[1];
         const int H = shape[2];
         const int W = shape[3];
 
@@ -649,7 +650,7 @@ namespace fulcrum::io
             throw std::runtime_error("Invalid image dimensions.");
 
         const std::size_t plane = static_cast<std::size_t>(H) * W;
-        const std::size_t base = static_cast<std::size_t>(imgIdx) * 3 * plane;
+        const std::size_t base = static_cast<std::size_t>(imgIdx) * C * plane;
 
         const float* data = X.getFloatData();
 
@@ -658,13 +659,13 @@ namespace fulcrum::io
         if (!out)
             throw std::runtime_error("Cannot open image file.");
 
-        out << "P6\n" << W << ' ' << H << "\n255\n";
+        out << (C == 1 ? "P5\n" : "P6\n") << W << ' ' << H << "\n255\n";
 
         for (int y = 0; y < H; ++y)
         {
             for (int x = 0; x < W; ++x)
             {
-                for (int c = 0; c < 3; ++c)
+                for (int c = 0; c < C; ++c)
                 {
                     const std::size_t index =
                         base + c * plane +
@@ -691,5 +692,201 @@ namespace fulcrum::io
 
         if (!out)
             throw std::runtime_error("Failed to write image file.");
+    }
+
+    CPUTensor load_img(const cv::String& path, bool resize, int size)
+    {
+        if (size <= 0)
+            throw runtime_error("Size cannot be negative!");
+
+        std::cout << "File exists: "
+            << std::filesystem::exists(path) << '\n';
+
+        cv::Mat loaded = cv::imread(path, cv::IMREAD_UNCHANGED);
+
+        cout << "Channels: " << loaded.channels() << "\n";
+
+        if (loaded.empty())
+            throw runtime_error("Unable to read image at " + path);
+
+        if (loaded.rows < size || loaded.cols < size)
+            throw runtime_error("Image size cannot be smaller than specified size!");
+
+        if (resize)
+        {
+            cv::Mat padded;
+            cv::Mat resized;
+            int height, width, gap;
+
+            if (loaded.cols > loaded.rows)
+            {
+                height = lround(static_cast<double>(loaded.rows) / loaded.cols * size);
+                cv::resize(loaded, resized, cv::Size(size, height), 0.0, 0.0, cv::INTER_LANCZOS4);
+
+                gap = (size - height);
+                cv::copyMakeBorder(resized, padded, gap - (gap / 2), gap / 2, 0, 0, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+            }
+            else if (loaded.rows > loaded.cols)
+            {
+                width = lround(static_cast<double>(loaded.cols) / loaded.rows * size);
+                cv::resize(loaded, resized, cv::Size(width, size), 0.0, 0.0, cv::INTER_LANCZOS4);
+
+                gap = (size - width);
+                cv::copyMakeBorder(resized, padded, 0, 0, gap - (gap / 2), gap / 2, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+            }
+            else
+            {
+                cv::resize(loaded, padded, cv::Size(size, size), 0.0, 0.0, cv::INTER_LANCZOS4);
+            }
+
+            if (padded.channels() == 3)
+            {
+                CPUTensor loaded_img({ 1, 3, size, size });
+
+                for (int i = 0; i < padded.rows; i++)
+                {
+                    for (int j = 0; j < padded.cols; j++)
+                    {
+                        cv::Vec3b pixel = padded.at<cv::Vec3b>(i, j);
+
+                        loaded_img(i * size + j) = pixel[2] / 255.0f;
+                        loaded_img(size * size + i * size + j) = pixel[1] / 255.0f;
+                        loaded_img(2 * size * size + i * size + j) = pixel[0] / 255.0f;
+                    }
+                }
+
+                return loaded_img;
+            }
+            else if (padded.channels() == 1)
+            {
+                CPUTensor loaded_img({ 1, 1, size, size });
+
+                cv::Mat src = padded.isContinuous() ? padded : padded.clone();
+
+                vector<float> pixels;
+                src.reshape(1, 1).convertTo(pixels, CV_32F, 1.0 / 255.0);
+
+                loaded_img = pixels;
+
+                return loaded_img;
+            }
+            else
+                throw runtime_error("Channel count not supported! Use 1 or 3 channels.");
+        }
+        else
+        {
+            if (loaded.channels() == 3)
+            {
+                CPUTensor loaded_img({ 1, 3, loaded.rows, loaded.cols });
+
+                for (int i = 0; i < loaded.rows; i++)
+                {
+                    for (int j = 0; j < loaded.cols; j++)
+                    {
+                        cv::Vec3b pixel = loaded.at<cv::Vec3b>(i, j);
+
+                        loaded_img(i * loaded.cols + j) = pixel[2] / 255.0f;
+                        loaded_img(loaded.rows * loaded.cols + i * loaded.cols + j) = pixel[1] / 255.0f;
+                        loaded_img(2 * loaded.rows * loaded.cols + i * loaded.cols + j) = pixel[0] / 255.0f;
+                    }
+                }
+
+                return loaded_img;
+            }
+            else if (loaded.channels() == 1)
+            {
+                CPUTensor loaded_img({ 1, 1, loaded.rows, loaded.cols });
+
+                cv::Mat src = loaded.isContinuous() ? loaded : loaded.clone();
+
+                vector<float> pixels;
+                src.reshape(1, 1).convertTo(pixels, CV_32F, 1.0 / 255.0);
+
+                loaded_img = pixels;
+
+                return loaded_img;
+            }
+            else
+                throw runtime_error("Channel count not supported! Use 1 or 3 channels.");
+        }
+    }
+
+    CPUTensor loadMatrixBin(const string& filepath, int rows, int cols)
+    {
+        CPUTensor mat({ rows, cols });
+
+        ifstream file(filepath, ios::binary);
+
+        if (!file)
+        {
+            throw runtime_error("File " + filepath + " could not be opened");
+        }
+
+        file.read(
+            reinterpret_cast<char*>(mat.getFloatData()),
+            rows * cols * sizeof(float)
+        );
+
+        if (!file)
+        {
+            throw runtime_error("Error while reading file" + filepath);
+        }
+
+        return mat;
+    }
+
+    CPUTensor loadTensorBin(
+        const std::string& filepath,
+        const std::vector<int>& shape)
+    {
+        static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559,
+            "The exporter requires IEEE-754 float32.");
+
+        // The exported format is little-endian, as on your Windows x86-64 machine.
+        const std::uint32_t one = 1;
+        if (*reinterpret_cast<const unsigned char*>(&one) != 1)
+            throw std::runtime_error("This loader requires a little-endian host.");
+
+        if (shape.empty())
+            throw std::runtime_error("Dataset shape cannot be empty!");
+
+        // Your Tensor implementation uses int counts/indices.
+        size_t count = 1;
+        for (int dimension : shape)
+        {
+            if (dimension <= 0)
+                throw std::runtime_error("Dataset dimensions must be positive!");
+
+            if (count > static_cast<size_t>(std::numeric_limits<int>::max()) /
+                static_cast<size_t>(dimension))
+                throw std::runtime_error("Dataset exceeds int indexing capacity!");
+
+            count *= static_cast<size_t>(dimension);
+        }
+
+        if (count > static_cast<size_t>(std::numeric_limits<std::streamsize>::max()) /
+            sizeof(float))
+            throw std::runtime_error("Dataset exceeds stream read capacity!");
+
+        const std::streamsize bytes =
+            static_cast<std::streamsize>(count * sizeof(float));
+
+        std::ifstream file(filepath, std::ios::binary | std::ios::ate);
+        if (!file)
+            throw std::runtime_error("Could not open file: " + filepath);
+
+        if (file.tellg() != std::streampos(bytes))
+            throw std::runtime_error(
+                "File size does not match the requested shape: " + filepath);
+
+        file.seekg(0, std::ios::beg);
+
+        // CPUTensor's default dtype is float32.
+        CPUTensor mat(shape);
+        file.read(reinterpret_cast<char*>(mat.getFloatData()), bytes);
+        if (!file)
+            throw std::runtime_error("Error reading file: " + filepath);
+
+        return mat;
     }
 }

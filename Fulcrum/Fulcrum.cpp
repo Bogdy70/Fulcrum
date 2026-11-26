@@ -1407,7 +1407,7 @@ int main()
 
         predict_cnn(load_model1, Imgtest, Y_Imgtest, 2);
 
-        save_cnn_image(X_test_meteors, 7, "C:/Users/ASUS/Downloads/selected_meteor.ppm");
+        //save_cnn_image(X_test_meteors, 7, "C:/Users/ASUS/Downloads/selected_meteor.ppm");
 
         cout << "\n\nParams copy test\n\n";
 
@@ -1448,6 +1448,9 @@ int main()
         CPUTensor loaded3 = load_img("C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us1.PNG", 256);
         save_cnn_image(loaded3, 0, "C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us_resized2.png");
 
+        CPUTensor loaded4 = load_img("C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us1.PNG", false);
+        save_cnn_image(loaded4, 0, "C:/Users/ASUS/Downloads/Fulcrum_images_to_load/Us_the_same.png");
+
         CPUTensor loaded_label({ 1, 1 });
         loaded_label = vector<float>{ 0 };
 
@@ -1466,7 +1469,7 @@ int main()
         predict_pet_custom(pets_model, X_test_cd.toCUDA(), 37);
         predict_pet_custom(pets_model, load_pet.toCUDA(), 0);
 
-        cout << "\n\nDataloader object test!\n\n";
+        cout << "\n\nDataloader object test\n\n";
 
         DataLoader loader1(X_test_cd, y_test_cd);
 
@@ -1495,6 +1498,18 @@ int main()
             cout << "\n";
         }
 
+        cout << "\n\ndK cnn test\n\n";
+
+        Tensor AdK({ 1, 1, 3, 3 });
+        AdK = std::vector<float>{ 3, 6, 9, 12, 15, 18, 21, 32, 36 };
+
+        Tensor dZ({ 1, 1, 2, 2 });
+        dZ = std::vector<float>{ 1, 2, 3, 4 };
+
+        auto dK = Tensor::conv2D_dK(AdK, dZ, 2, 1, 1, 0).toCPU();
+        dK.print();
+        dK.print_dims();
+
 
         cout << "\n\nCUDA Cats vs Dogs dataset test\n\n";
 
@@ -1513,16 +1528,32 @@ int main()
                 {1, 1, 1, 0}
             };
 
+            vector<convStats> cv_pets_big = {
+                {3, 16, 3, 2, 2, 1},
+                {16, 32, 3, 1, 1, 1},
+                {32, 64, 3, 1, 1, 1},
+                {64, 128, 3, 1, 1, 1},
+                {128, 128, 3, 1, 1, 1}
+            };
+
+            vector<MaxPoolStats> mx_pets_big = {
+                {2, 2, 2, 0},
+                {2, 2, 2, 0},
+                {2, 2, 2, 0},
+                {2, 2, 2, 0},
+                {1, 1, 1, 0}
+            };
+
             start = chrono::high_resolution_clock::now();
 
             CPUTensor::setSeed(42);
 
-            Parameters params_pets = init_conv(cv_pets, mx_pets, X_train_cd.toCUDA(), y_train_cd.getShape()[0], "relu");
-            CNN_model pets_model1(params_pets, cv_pets, mx_pets, "relu");
             DataLoader train_loader_cd(X_train_cd, y_train_cd);
             DataLoader test_loader_cd(X_val_cd, y_val_cd);
+            Parameters params_pets = init_conv(cv_pets_big, mx_pets_big, train_loader_cd[0].sample.toCUDA(), train_loader_cd[0].label.getShape()[0], "relu");
+            CNN_model pets_model1(params_pets, cv_pets_big, mx_pets_big, "relu");
 
-            train_cnn(pets_model1, train_loader_cd, test_loader_cd, 0.001f, 400, 27, 0.10f, 0.0f, 0.1f, true);
+            train_cnn(pets_model1, train_loader_cd, test_loader_cd, 0.001f, 100, 10, 0.30f, 0.0f, 0.10f, true);
 
             cudaDeviceSynchronize();
 
@@ -1609,7 +1640,7 @@ int main()
             save_cnn(model_stopping, "C:/Users/ASUS/Downloads/Fulcrum_save_tests/Jeston_test.bin", true);
         }
 
-        DataLoader train_loader_meteors(X_train_meteors, y_train_meteors);
+        /*DataLoader train_loader_meteors(X_train_meteors, y_train_meteors);
         DataLoader test_loader_meteors(X_val_meteors, y_val_meteors);
 
         {
@@ -1930,7 +1961,7 @@ int main()
 
         cout << "\nCUDA mnist training time: " << elapsed.count() << " seconds\n";
         
-        predict(X_test_mnist, y_test_mnist, params6, "relu", 101);
+        predict(X_test_mnist, y_test_mnist, params6, "relu", 101);*/
     }
     catch (const exception& e)
     {

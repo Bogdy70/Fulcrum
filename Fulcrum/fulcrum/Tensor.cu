@@ -522,6 +522,60 @@ namespace fulcrum
 		}
 	}
 
+	/*__global__ void dK2DKernelBlock(
+		float* dK, const float* A, const float* dZ,
+		int size, int frd_kdim, int hS, int vS,
+		int channels, int filters, int batch_size,
+		int N, int M, int kdimN, int kdimM)
+	{
+		int idx = blockIdx.x;  // One block per weight.
+		int tid = threadIdx.x;
+		if (idx >= size) return;
+
+		extern __shared__ float partial[];
+
+		float total = 0.0f;
+		int k = idx / (channels * frd_kdim * frd_kdim);
+		int ires = idx % (channels * frd_kdim * frd_kdim);
+
+		int output_area = kdimN * kdimM;
+
+		// Each thread gets some of the old (j, i) pairs.
+		for (int term = tid; term < batch_size * output_area; term += blockDim.x)
+		{
+			int j = term / output_area;
+			int i = term % output_area;
+
+			// Your original mappings.
+			int idxA = i / kdimM * (vS * M)
+				+ i % kdimM * hS
+				+ ires % frd_kdim
+				+ ires / frd_kdim * M
+				+ ires / (frd_kdim * frd_kdim) * (N - frd_kdim) * M
+				+ j * channels * N * M;
+
+			int idxdZ = i + k * kdimN * kdimM + j * filters * kdimN * kdimM;
+
+			total += A[idxA] * dZ[idxdZ];
+		}
+
+		// Each thread saves its own part of the sum.
+		partial[tid] = total;
+		__syncthreads();
+
+		// Combine the parts. This assumes a power-of-two block size.
+		for (int gap = blockDim.x / 2; gap > 0; gap /= 2)
+		{
+			if (tid < gap)
+				partial[tid] += partial[tid + gap];
+
+			__syncthreads();
+		}
+
+		if (tid == 0)
+			dK[idx] = partial[0] / batch_size;
+	}*/
+
 	Tensor Tensor::conv2D_dK(const Tensor& A, const Tensor& dZ, int frd_kdim, int hStride, int vStride, int frd_padding)
 	{
 		if (A.dtype != DataType::float32 || dZ.dtype != DataType::float32)
@@ -558,6 +612,11 @@ namespace fulcrum
 		int block = 256;
 
 		int grid = (dK.total + block - 1) / block;
+
+		//const int block = 256;
+		//const int grid = dK.total;  // One block per weight
+
+		//dK2DKernelBlock << <grid, block, block * sizeof(float) >> > (dK.getFloatData(), paddedA.getFloatData(), dZ.getFloatData(), dK.total, frd_kdim, hStride, vStride, channels, filters, batch_size, N, M, kdimN, kdimM);
 
 		dK2DKernel << <grid, block >> > (dK.getFloatData(), paddedA.getFloatData(), dZ.getFloatData(), dK.total, frd_kdim, hStride, vStride, channels, filters, batch_size, N, M, kdimN, kdimM);
 

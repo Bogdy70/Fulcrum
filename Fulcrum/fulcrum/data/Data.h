@@ -9,6 +9,21 @@
 
 namespace fulcrum::data
 {
+	struct Dataset
+	{
+		CPUTensor samples;
+		CPUTensor labels;
+
+		Dataset(const CPUTensor& X, const CPUTensor& y): samples(X), labels(y) {}
+	};
+
+	struct DatasetSplits
+	{
+		Dataset train;
+		Dataset test;
+		Dataset val;
+	};
+
 	struct DataLoader
 	{
 		CPUTensor samples;
@@ -25,6 +40,19 @@ namespace fulcrum::data
 
 			this->samples = X;
 			this->labels = y;
+			this->batch_size = batch_size;
+		}
+
+		DataLoader(const Dataset& data, int batch_size = 32)
+		{
+			if (data.samples.dim() != 4)
+				throw runtime_error("Dataset samples must be 4 dimensional!");
+
+			if (data.labels.dim() != 2)
+				throw runtime_error("Dataset labels must be 2 dimensional!");
+
+			this->samples = data.samples;
+			this->labels = data.labels;
 			this->batch_size = batch_size;
 		}
 
@@ -74,10 +102,4 @@ namespace fulcrum::data
 	float choose_label(const Tensor& y, int idx);
 
 	CPUTensor choose_img(const CPUTensor& X, int idx);
-
-	CPUTensor load_img(const cv::String& path, int size = 128);
-
-	CPUTensor loadMatrixBin(const std::string& filepath, int rows, int cols);
-
-	CPUTensor loadTensorBin(const std::string& filepath, const std::vector<int>& shape);
 }

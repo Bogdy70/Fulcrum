@@ -30,3 +30,7 @@ obj/
 # Cache/temp
 *.log
 *.tmp
+
+# Local Nsight Systems profiling outputs
+/Fulcrum/fulcrum_dk*.nsys-rep
+/Fulcrum/fulcrum_dk*.sqlite
