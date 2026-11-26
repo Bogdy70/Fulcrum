@@ -1,6 +1,7 @@
 #include <fulcrum/data/Data.h>
 #include <iostream>
 #include <filesystem>
+#include <fulcrum/io/IO.h>
 
 using namespace std;
 
@@ -180,5 +181,62 @@ namespace fulcrum::data
         }
 
         return one_img;
+    }
+
+    Dataset make_dataset(const cv::String& path, const vector<string>& classes, bool resize, int size)
+    {
+        filesystem::path root = path;
+        int sample_counter = 0;
+        vector<float> class_idxs;
+        vector<float> data;
+        vector<float> img_data;
+        CPUTensor samples;
+        CPUTensor labels;
+        Dataset dataset(samples, labels);
+
+        for (int i = 0; i < classes.size(); i++)
+        {
+            string class_name = classes[i];
+
+            for (const auto& img_entry : filesystem::directory_iterator(root / class_name))
+            {
+                if(img_entry.is_regular_file())
+                    std::cout << class_name << " -> " << img_entry.path().string() << '\n';
+
+                if (!(img_entry.is_regular_file()))
+                    continue;
+
+                samples = io::load_img(img_entry.path().string(), resize, size);
+
+                img_data = samples.getFloatVector();
+
+                data.insert(data.end(), img_data.begin(), img_data.end());
+
+                class_idxs.push_back(i);
+
+                sample_counter++;
+            }
+        }
+
+        if (samples.getShape().empty())
+            throw runtime_error("No image was found!");
+
+        dataset.samples.resize({ sample_counter, samples.getShape()[1], samples.getShape()[2], samples.getShape()[3] });
+        dataset.samples = data;
+
+        if (classes.size() == 2)
+        {
+            dataset.labels.resize({ 1, sample_counter });
+            dataset.labels = class_idxs;
+        }
+        else
+        {
+            dataset.labels = CPUTensor::zeros({ static_cast<int>(classes.size()), sample_counter });
+            for (int i = 0; i < class_idxs.size(); i++)
+                dataset.labels(class_idxs[i] * sample_counter + i) = 1.0f;
+        }
+        dataset.class_labels = classes;
+
+        return dataset;
     }
 }

@@ -709,11 +709,11 @@ namespace fulcrum::io
         if (loaded.empty())
             throw runtime_error("Unable to read image at " + path);
 
-        if (loaded.rows < size || loaded.cols < size)
-            throw runtime_error("Image size cannot be smaller than specified size!");
-
         if (resize)
         {
+            if (loaded.rows < size || loaded.cols < size)
+                throw runtime_error("Image size cannot be smaller than specified size!");
+
             cv::Mat padded;
             cv::Mat resized;
             int height, width, gap;

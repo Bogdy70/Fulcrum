@@ -13,6 +13,7 @@ namespace fulcrum::data
 	{
 		CPUTensor samples;
 		CPUTensor labels;
+		vector<string> class_labels;
 
 		Dataset(const CPUTensor& X, const CPUTensor& y): samples(X), labels(y) {}
 	};
@@ -102,4 +103,6 @@ namespace fulcrum::data
 	float choose_label(const Tensor& y, int idx);
 
 	CPUTensor choose_img(const CPUTensor& X, int idx);
+
+	Dataset make_dataset(const cv::String& path, const vector<string>& classes, bool resize = true, int size = 128);
 }

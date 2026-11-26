@@ -1510,6 +1510,19 @@ int main()
         dK.print();
         dK.print_dims();
 
+        cout << "\n\nDataset maker test\n\n";
+
+        Dataset dataset1 = make_dataset("C:/Users/ASUS/Downloads/fulcrum_test_dataset/fulcrum_test_dataset", { "no_meteor", "meteor" });
+        dataset1.samples.print_dims();
+        dataset1.labels.print_dims();
+        cout << "\n";
+        dataset1.labels.print();
+
+        //Dataset dataset2 = make_dataset("C:/Users/ASUS/Downloads/mnist_png/mnist_png/testing", { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" }, false);
+        //dataset2.samples.print_dims();
+        //dataset2.labels.print_dims();
+        //dataset2.labels.print();
+
 
         cout << "\n\nCUDA Cats vs Dogs dataset test\n\n";
 

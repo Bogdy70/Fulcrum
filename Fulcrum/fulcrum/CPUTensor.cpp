@@ -123,6 +123,15 @@ namespace fulcrum
 		return data.f.data();
 	}
 
+	const vector<float>& CPUTensor::getFloatVector() const
+	{
+		if (dtype != DataType::float32) {
+			throw std::runtime_error("Data type must be float!");
+		}
+
+		return data.f;
+	}
+
 	int* CPUTensor::getIntData()
 	{
 		if (dtype != DataType::int32)
@@ -155,6 +164,31 @@ namespace fulcrum
 	int CPUTensor::dim() const
 	{
 		return static_cast<int>(shape.size());
+	}
+
+	CPUTensor CPUTensor::zeros(const vector<int>& shape, const DataType& dtype)
+	{
+		CPUTensor T(shape, dtype);
+		for (int i = 0; i < T.size(); i++)
+			T(i) = 0.0f;
+		return T;
+	}
+
+	CPUTensor& CPUTensor::resize(const vector<int>& shape)
+	{
+		if (dtype != DataType::float32)
+			throw runtime_error("Data type must be float32!");
+
+		CPUTensor X = zeros(shape, dtype);
+
+		int copySize = total <= X.total ? total : X.total;
+
+		for (int i = 0; i < copySize; i++)
+			X(i) = data.f[i];
+
+		*this = move(X);
+
+		return *this;
 	}
 
 	const vector<int>& CPUTensor::getShape() const

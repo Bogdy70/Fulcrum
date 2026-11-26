@@ -41,6 +41,8 @@ namespace fulcrum
 
 		const float* getFloatData() const;
 
+		const std::vector<float>& getFloatVector() const;
+
 		int* getIntData();
 
 		const int* getIntData() const;
@@ -50,6 +52,10 @@ namespace fulcrum
 		int size() const;
 
 		int dim() const;
+
+		static CPUTensor zeros(const vector<int>& shape, const DataType& dtype = DataType::float32);
+
+		CPUTensor& resize(const vector<int>& shape);
 
 		const vector<int>& getShape() const;
 
