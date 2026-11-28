@@ -23,6 +23,8 @@ namespace fulcrum::data
 		Dataset train;
 		Dataset test;
 		Dataset val;
+
+		DatasetSplits(const Dataset& train, const Dataset& test, const Dataset& val): train(train), test(test), val(val) {}
 	};
 
 	struct DataLoader
@@ -105,4 +107,6 @@ namespace fulcrum::data
 	CPUTensor choose_img(const CPUTensor& X, int idx);
 
 	Dataset make_dataset(const cv::String& path, const vector<string>& classes, bool resize = true, int size = 128);
+
+	DatasetSplits train_test_val_split(const Dataset& dataset, float test = 0.1f, float val = 0.2f, bool shuffle = true, int seed = 42);
 }

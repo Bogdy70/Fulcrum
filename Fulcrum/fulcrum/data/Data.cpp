@@ -1,6 +1,8 @@
 #include <fulcrum/data/Data.h>
 #include <iostream>
 #include <filesystem>
+#include <numeric>
+#include <random>
 #include <fulcrum/io/IO.h>
 
 using namespace std;
@@ -238,5 +240,239 @@ namespace fulcrum::data
         dataset.class_labels = classes;
 
         return dataset;
+    }
+
+    DatasetSplits train_test_val_split(const Dataset& dataset, float test, float val, bool shuffle, int seed)
+    {
+        if (test < 0.0f)
+            throw runtime_error("Test percentage value cannot be negative!");
+
+        if (val < 0.0f)
+            throw runtime_error("Validation percentage value cannot be negative!");
+
+        if (dataset.samples.dim() != 4)
+            throw runtime_error("Dataset samples must have shape (sample_count, C, H, W)!");
+
+        if (dataset.labels.dim() != 2)
+            throw runtime_error("Dataset labels must have shape (class_count, sample_count)!");
+
+        int sample_count = dataset.samples.getShape()[0];
+        vector<int> idxs(sample_count);
+        iota(idxs.begin(), idxs.end(), 0);
+
+        if (shuffle)
+        {
+            mt19937 rng(seed);
+            std::shuffle(idxs.begin(), idxs.end(), rng);
+        }
+
+        int C = dataset.samples.getShape()[1];
+        int H = dataset.samples.getShape()[2];
+        int W = dataset.samples.getShape()[3];
+        int classes = dataset.labels.getShape()[0];
+
+        int test_samples = sample_count * test;
+        int val_samples = (sample_count - test_samples) * val;
+        int train_samples = sample_count - test_samples - val_samples;
+
+        CPUTensor X_train({ train_samples, C, H, W });
+        CPUTensor y_train({ classes, train_samples });
+
+        CPUTensor X_test({ test_samples, C, H, W });
+        CPUTensor y_test({ classes, test_samples });
+
+        CPUTensor X_val({ val_samples, C, H, W });
+        CPUTensor y_val({ classes, val_samples });
+
+        Dataset train_data(X_train, y_train);
+        Dataset test_data(X_test, y_test);
+        Dataset val_data(X_val, y_val);
+
+        DatasetSplits splits(train_data, test_data, val_data);
+
+        if (train_samples >= val_samples && train_samples >= test_samples)
+        {
+            for (int i = 0; i < train_samples; i++)
+            {
+                int idx = idxs[i];
+                for (int c = 0; c < C; c++)
+                {
+                    for (int h = 0; h < H; h++)
+                    {
+                        for (int w = 0; w < W; w++)
+                        {
+                            int train_idx = idx * C * H * W + c * H * W + h * W + w;
+                            int train_splits_idx = i * C * H * W + c * H * W + h * W + w;
+                            splits.train.samples(train_splits_idx) = dataset.samples(train_idx);
+                            
+                            if (i >= (train_samples - val_samples))
+                            {
+                                int new_idx = idxs[i + val_samples];
+                                int new_splits_idx = i - (train_samples - val_samples);
+                                int val_splits_idx = new_splits_idx * C * H * W + c * H * W + h * W + w;
+                                int val_idx = new_idx * C * H * W + c * H * W + h * W + w;
+                                splits.val.samples(val_splits_idx) = dataset.samples(val_idx);
+                            }
+                            if (i >= (train_samples - test_samples))
+                            {
+                                int new_idx = idxs[i + val_samples + test_samples];
+                                int new_splits_idx = i - (train_samples - test_samples);
+                                int test_splits_idx = new_splits_idx * C * H * W + c * H * W + h * W + w;
+                                int test_idx = new_idx * C * H * W + c * H * W + h * W + w;
+                                splits.test.samples(test_splits_idx) = dataset.samples(test_idx);
+                            }             
+                        }
+                    }
+
+                    for (int cl = 0; cl < classes; cl++)
+                    {
+                        int train_idx = cl * sample_count + idx;
+                        int train_splits_idx = cl * train_samples + i;
+                        splits.train.labels(train_splits_idx) = dataset.labels(train_idx);
+
+                        if (i >= (train_samples - val_samples))
+                        {
+                            int new_idx = idxs[i + val_samples];
+                            int new_splits_idx = i - (train_samples - val_samples);
+                            int val_idx = cl * sample_count + new_idx;
+                            int val_splits_idx = cl * val_samples + new_splits_idx;
+                            splits.val.labels(val_splits_idx) = dataset.labels(val_idx);
+                        }
+                        if (i >= (train_samples - test_samples))
+                        {
+                            int new_idx = idxs[i + val_samples + test_samples];
+                            int new_splits_idx = i - (train_samples - test_samples);
+                            int test_idx = cl * sample_count + new_idx;
+                            int test_splits_idx = cl * test_samples + new_splits_idx;
+                            splits.test.labels(test_splits_idx) = dataset.labels(test_idx);
+                        }
+                    }
+                }
+            }
+        }
+        else if (val_samples >= train_samples && val_samples >= test_samples)
+        {
+            for (int i = 0; i < val_samples; i++)
+            {
+                int idx = idxs[i];
+                for (int c = 0; c < C; c++)
+                {
+                    for (int h = 0; h < H; h++)
+                    {
+                        for (int w = 0; w < W; w++)
+                        {
+                            int val_idx = idx * C * H * W + c * H * W + h * W + w;
+                            int val_splits_idx = i * C * H * W + c * H * W + h * W + w;
+                            splits.val.samples(val_splits_idx) = dataset.samples(val_idx);
+
+                            if (i >= (val_samples - train_samples))
+                            {
+                                int new_idx = idxs[i + train_samples];
+                                int new_splits_idx = i - (val_samples - train_samples);
+                                int train_idx = new_idx * C * H * W + c * H * W + h * W + w;
+                                int train_splis_idx = new_splits_idx * C * H * W + c * H * W + h * W + w;
+                                splits.train.samples(train_splis_idx) = dataset.samples(train_idx);
+                            }
+                            if (i >= (val_samples - test_samples))
+                            {
+                                int new_idx = idxs[i + train_samples + test_samples];
+                                int new_splits_idx = i - (val_samples - test_samples);
+                                int test_idx = new_idx * C * H * W + c * H * W + h * W + w;
+                                int test_splits_idx = new_splits_idx * C * H * W + c * H * W + h * W + w;
+                                splits.test.samples(test_splits_idx) = dataset.samples(test_idx);
+                            }
+                        }
+                    }
+                }
+
+                for (int cl = 0; cl < classes; cl++)
+                {
+                    int val_idx = cl * sample_count + idx;
+                    int val_splits_idx = cl * val_samples + i;
+                    splits.val.labels(val_splits_idx) = dataset.labels(val_idx);
+
+                    if (i >= (val_samples - train_samples))
+                    {
+                        int new_idx = idxs[i + train_samples];
+                        int new_splits_idx = i - (val_samples - train_samples);
+                        int train_idx = cl * sample_count + new_idx;
+                        int train_splits_idx = cl * train_samples + new_splits_idx;
+                        splits.train.labels(train_splits_idx) = dataset.labels(train_idx);
+                    }
+                    if (i >= (val_samples - test_samples))
+                    {
+                        int new_idx = idxs[i + train_samples + test_samples];
+                        int new_splits_idx = i - (val_samples - test_samples);
+                        int test_idx = cl * sample_count + new_idx;
+                        int test_splits_idx = cl * test_samples + new_splits_idx;
+                        splits.test.labels(test_splits_idx) = dataset.labels(test_idx);
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (int i = 0; i < test_samples; i++)
+            {
+                int idx = idxs[i];
+                for (int c = 0; c < C; c++)
+                {
+                    for (int h = 0; h < H; h++)
+                    {
+                        for (int w = 0; w < W; w++)
+                        {
+                            int test_idx = idx * C * H * W + c * H * W + h * W + w;
+                            int test_splits_idx = i * C * H * W + c * H * W + h * W + w;
+                            splits.test.samples(test_splits_idx) = dataset.samples(test_idx);
+
+                            if (i >= (test_samples - train_samples))
+                            {
+                                int new_idx = idxs[i + train_samples];
+                                int new_splits_idx = i - (test_samples - train_samples);
+                                int train_idx = new_idx * C * H * W + c * H * W + h * W + w;
+                                int train_splits_idx = new_splits_idx * C * H * W + c * H * W + h * W + w;
+                                splits.train.samples(train_splits_idx) = dataset.samples(train_idx);
+                            }
+
+                            if (i >= (test_samples - val_samples))
+                            {
+                                int new_idx = idxs[i + train_samples + val_samples];
+                                int new_splits_idx = i - (test_samples - val_samples);
+                                int val_idx = new_idx * C * H * W + c * H * W + h * W + w;
+                                int val_splits_idx = new_splits_idx * C * H * W + c * H * W + h * W + w;
+                                splits.val.samples(val_splits_idx) = dataset.samples(val_idx);
+                            }
+                        }
+                    }
+                }
+
+                for (int cl = 0; cl < classes; cl++)
+                {
+                    int test_idx = cl * sample_count + idx;
+                    int test_splits_idx = cl * test_samples + i;
+                    splits.test.labels(test_splits_idx) = dataset.labels(test_idx);
+
+                    if (i >= (test_samples - train_samples))
+                    {
+                        int new_idx = idxs[i + train_samples];
+                        int new_splits_idx = i - (test_samples - train_samples);
+                        int train_idx = cl * sample_count + new_idx;
+                        int train_splits_idx = cl * train_samples + new_splits_idx;
+                        splits.train.labels(train_splits_idx) = dataset.labels(train_idx);
+                    }
+
+                    if (i >= (test_samples - val_samples))
+                    {
+                        int new_idx = idxs[i + train_samples + val_samples];
+                        int new_splits_idx = i - (test_samples - val_samples);
+                        int val_idx = cl * sample_count + new_idx;
+                        int val_splits_idx = cl * val_samples + new_splits_idx;
+                        splits.val.labels(val_splits_idx) = dataset.labels(val_idx);
+                    }
+                }
+            }
+        }
+
+        return splits;
     }
 }
